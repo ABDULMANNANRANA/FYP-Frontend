@@ -21,9 +21,6 @@ import { useTheme } from '../../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 
-// ============================================================
-// Helper: reset navigation to the Login screen inside AuthStack.
-// ============================================================
 const goToLogin = navigation => {
   navigation.reset({
     index: 0,
@@ -41,30 +38,23 @@ const goToLogin = navigation => {
 const CreateGroup = ({ navigation }) => {
   const { isDark, theme } = useTheme();
 
-  // ── Step state: 'name' | 'members' ────────────────────────────────
-  const [step, setStep] = useState('name');
+  // WhatsApp style flow:
+  // Step 1 = Select Members
+  // Step 2 = Enter Group Name
+  const [step, setStep] = useState('members');
 
-  // Group name
   const [groupName, setGroupName] = useState('');
-
-  // Members list
   const [members, setMembers] = useState([]);
 
-  // Fields for adding a new member manually
   const [memberName, setMemberName] = useState('');
   const [memberPhone, setMemberPhone] = useState('');
 
-  // Existing contacts
   const [existingContacts, setExistingContacts] = useState([]);
   const [showContacts, setShowContacts] = useState(false);
   const [loadingContacts, setLoadingContacts] = useState(false);
 
-  // Submit loading
   const [loading, setLoading] = useState(false);
 
-  // ─────────────────────────────────────────────────────────────────
-  // GET AUTH HEADERS
-  // ─────────────────────────────────────────────────────────────────
   const getAuthHeaders = async () => {
     const token = await AsyncStorage.getItem('token');
 
@@ -78,9 +68,9 @@ const CreateGroup = ({ navigation }) => {
     };
   };
 
-  // ─────────────────────────────────────────────────────────────────
+  // ============================================================
   // FETCH EXISTING CONTACTS
-  // ─────────────────────────────────────────────────────────────────
+  // ============================================================
   const fetchExistingContacts = useCallback(async () => {
     try {
       setLoadingContacts(true);
@@ -112,7 +102,7 @@ const CreateGroup = ({ navigation }) => {
 
       try {
         res = await response.json();
-      } catch (jsonError) {
+      } catch (error) {
         throw new Error('Invalid response received from server.');
       }
 
@@ -134,7 +124,8 @@ const CreateGroup = ({ navigation }) => {
 
       if (!response.ok) {
         throw new Error(
-          res?.message || `Failed to fetch groups. Status: ${response.status}`
+          res?.message ||
+          `Failed to fetch contacts. Status: ${response.status}`
         );
       }
 
@@ -147,15 +138,25 @@ const CreateGroup = ({ navigation }) => {
             const name =
               member.displayName ||
               member.name ||
+              `${member.firstName || ''} ${member.lastName || ''}`.trim();
+
+            const phone =
+              member.phone ||
+              member.phoneNumber ||
               '';
 
-            const phone = member.phone || '';
+            const userId =
+              member.userId ??
+              member.id ??
+              member.UserId ??
+              member.Id ??
+              null;
 
             if (!name || name === 'Unknown') {
               return;
             }
 
-            const key = `${name}_${phone}`;
+            const key = `${String(userId || '')}_${name}_${phone}`;
 
             if (seen.has(key)) {
               return;
@@ -164,19 +165,18 @@ const CreateGroup = ({ navigation }) => {
             seen.add(key);
 
             list.push({
-              id: `ec_${member.id || Date.now()}_${group.id}`,
+              id: `contact_${userId || Date.now()}_${group.id || ''}`,
+              userId: userId,
               name,
               phone,
+              isRegistered: !!userId,
             });
           });
         });
 
         setExistingContacts(list);
       } else {
-        console.log(
-          'Fetch groups failed:',
-          res?.message || 'Unknown error'
-        );
+        setExistingContacts([]);
       }
     } catch (error) {
       console.log('fetchExistingContacts error:', error);
@@ -190,16 +190,44 @@ const CreateGroup = ({ navigation }) => {
     }
   }, [navigation]);
 
-  // Fetch contacts whenever screen gets focus
   useFocusEffect(
     useCallback(() => {
       fetchExistingContacts();
     }, [fetchExistingContacts])
   );
 
-  // ─────────────────────────────────────────────────────────────────
-  // ADD MEMBER MANUALLY
-  // ─────────────────────────────────────────────────────────────────
+  // ============================================================
+  // CHECK DUPLICATE MEMBER
+  // ============================================================
+  const isAlreadyAdded = (name, phone, userId = null) => {
+    return members.some(member => {
+      if (userId && member.userId) {
+        return String(member.userId) === String(userId);
+      }
+
+      if (
+        phone &&
+        member.phone &&
+        member.phone.trim() === phone.trim()
+      ) {
+        return true;
+      }
+
+      if (
+        name &&
+        member.name &&
+        member.name.toLowerCase() === name.toLowerCase()
+      ) {
+        return true;
+      }
+
+      return false;
+    });
+  };
+
+  // ============================================================
+  // ADD MANUAL / EXTERNAL MEMBER
+  // ============================================================
   const addMemberManually = () => {
     const trimmedName = memberName.trim();
     const trimmedPhone = memberPhone.trim();
@@ -214,15 +242,9 @@ const CreateGroup = ({ navigation }) => {
       return;
     }
 
-    const duplicate = members.find(
-      member =>
-        member.phone === trimmedPhone ||
-        member.name.toLowerCase() === trimmedName.toLowerCase()
-    );
-
-    if (duplicate) {
+    if (isAlreadyAdded(trimmedName, trimmedPhone)) {
       Alert.alert(
-        'Already added',
+        'Already Added',
         `${trimmedName} is already in the member list.`
       );
       return;
@@ -231,9 +253,12 @@ const CreateGroup = ({ navigation }) => {
     setMembers(prev => [
       ...prev,
       {
-        id: Date.now().toString(),
+        id: `external_${Date.now()}`,
+        userId: null,
         name: trimmedName,
         phone: trimmedPhone,
+        isRegistered: false,
+        isExternal: true,
       },
     ]);
 
@@ -241,20 +266,20 @@ const CreateGroup = ({ navigation }) => {
     setMemberPhone('');
   };
 
-  // ─────────────────────────────────────────────────────────────────
-  // ADD FROM EXISTING CONTACT
-  // ─────────────────────────────────────────────────────────────────
+  // ============================================================
+  // ADD REGISTERED MEMBER
+  // ============================================================
   const addFromExisting = contact => {
-    const duplicate = members.find(
-      member =>
-        member.phone === contact.phone ||
-        member.name.toLowerCase() === contact.name.toLowerCase()
-    );
-
-    if (duplicate) {
+    if (
+      isAlreadyAdded(
+        contact.name,
+        contact.phone,
+        contact.userId
+      )
+    ) {
       Alert.alert(
-        'Already added',
-        `${contact.name} is already in the list.`
+        'Already Added',
+        `${contact.name} is already in the member list.`
       );
       return;
     }
@@ -262,31 +287,63 @@ const CreateGroup = ({ navigation }) => {
     setMembers(prev => [
       ...prev,
       {
-        ...contact,
-        id: Date.now().toString(),
+        id: `registered_${contact.userId || Date.now()}`,
+        userId: contact.userId,
+        name: contact.name,
+        phone: contact.phone,
+        isRegistered: true,
+        isExternal: false,
       },
     ]);
 
     setShowContacts(false);
   };
 
-  // ─────────────────────────────────────────────────────────────────
+  // ============================================================
   // REMOVE MEMBER
-  // ─────────────────────────────────────────────────────────────────
+  // ============================================================
   const removeMember = id => {
     setMembers(prev =>
       prev.filter(member => member.id !== id)
     );
   };
 
-  // ─────────────────────────────────────────────────────────────────
+  // ============================================================
+  // GO TO GROUP NAME STEP
+  // ============================================================
+  const goToGroupName = () => {
+    if (members.length === 0) {
+      Alert.alert(
+        'Select Members',
+        'Please select at least one member before continuing.'
+      );
+      return;
+    }
+
+    setShowContacts(false);
+    setStep('name');
+  };
+
+  // ============================================================
   // CREATE GROUP
-  // ─────────────────────────────────────────────────────────────────
+  // ============================================================
   const createGroup = async () => {
     const trimmedGroupName = groupName.trim();
 
     if (!trimmedGroupName) {
-      Alert.alert('Error', 'Please enter a group name.');
+      Alert.alert(
+        'Group Name Required',
+        'Please enter a group name.'
+      );
+      return;
+    }
+
+    if (members.length === 0) {
+      Alert.alert(
+        'Members Required',
+        'Please select at least one member.'
+      );
+      setStep('members');
       return;
     }
 
@@ -309,35 +366,73 @@ const CreateGroup = ({ navigation }) => {
         return;
       }
 
-      const requestBody = {
-        name: trimmedGroupName,
-        memberUserIds: [],
-        externalMembers: members.map(member => ({
+      // Registered application users
+      const memberUserIds = members
+        .filter(
+          member =>
+            member.isRegistered &&
+            member.userId !== null &&
+            member.userId !== undefined
+        )
+        .map(member => Number(member.userId))
+        .filter(id => !Number.isNaN(id));
+
+      // External members manually added with name + phone
+      const externalMembers = members
+        .filter(
+          member =>
+            !member.isRegistered ||
+            !member.userId
+        )
+        .map(member => ({
           name: member.name,
           phone: member.phone,
-        })),
+        }));
+
+      const requestBody = {
+        name: trimmedGroupName,
+        memberUserIds,
+        externalMembers,
       };
 
-      console.log('Create Group URL:', `${BASE_URL}/Managment/group`);
-      console.log('Create Group Body:', requestBody);
+      console.log(
+        'Create Group URL:',
+        `${BASE_URL}/Managment/group`
+      );
 
-      const response = await fetch(`${BASE_URL}/Managment/group`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(requestBody),
-      });
+      console.log(
+        'Create Group Body:',
+        JSON.stringify(requestBody, null, 2)
+      );
 
-      console.log('Create Group Status:', response.status);
+      const response = await fetch(
+        `${BASE_URL}/Managment/group`,
+        {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(requestBody),
+        }
+      );
+
+      console.log(
+        'Create Group Status:',
+        response.status
+      );
 
       let res;
 
       try {
         res = await response.json();
-      } catch (jsonError) {
-        throw new Error('Invalid response received from server.');
+      } catch (error) {
+        throw new Error(
+          'Invalid response received from server.'
+        );
       }
 
-      console.log('Create Group Response:', res);
+      console.log(
+        'Create Group Response:',
+        res
+      );
 
       if (response.status === 401) {
         Alert.alert(
@@ -367,69 +462,125 @@ const CreateGroup = ({ navigation }) => {
           [
             {
               text: 'Go to Home',
-              onPress: () =>
-                navigation.navigate('HomeDashboard'),
+              onPress: () => {
+                setGroupName('');
+                setMembers([]);
+                setMemberName('');
+                setMemberPhone('');
+                setShowContacts(false);
+                setStep('members');
+
+                navigation.navigate('HomeDashboard');
+              },
             },
           ]
         );
-
-        setGroupName('');
-        setMembers([]);
-        setMemberName('');
-        setMemberPhone('');
-        setShowContacts(false);
-        setStep('name');
       } else {
         Alert.alert(
           'Error',
-          res?.message || 'Failed to create group.'
+          res?.message ||
+          'Failed to create group.'
         );
       }
     } catch (error) {
-      console.log('createGroup error:', error);
+      console.log(
+        'createGroup error:',
+        error
+      );
 
       Alert.alert(
         'Error',
-        error.message || 'Server not reachable.'
+        error.message ||
+        'Server not reachable.'
       );
     } finally {
       setLoading(false);
     }
   };
 
-  // Dynamic Theme Palette derivation for smooth dark/light adaptive styling
-  const isDarkTheme = isDark || theme?.mode === 'dark';
-  const cardBg = theme.card || (isDarkTheme ? '#1E293B' : '#FFFFFF');
-  const inputBg = isDarkTheme ? '#0F172A' : '#F1F5F9';
-  const inputBorder = isDarkTheme ? '#334155' : '#E2E8F0';
-  const textColor = theme.text || (isDarkTheme ? '#F8FAFC' : '#0F172A');
-  const subTextColor = isDarkTheme ? '#94A3B8' : '#64748B';
-  const primaryColor = isDarkTheme ? '#38BDF8' : '#0284C7';
-  const primaryBtnBg = isDarkTheme ? '#38BDF8' : '#0F172A';
-  const primaryBtnText = isDarkTheme ? '#0F172A' : '#FFFFFF';
+  // ============================================================
+  // THEME
+  // ============================================================
+  const isDarkTheme =
+    isDark || theme?.mode === 'dark';
 
-  // ─────────────────────────────────────────────────────────────────
+  const cardBg =
+    theme.card ||
+    (isDarkTheme ? '#1E293B' : '#FFFFFF');
+
+  const inputBg =
+    isDarkTheme ? '#0F172A' : '#F1F5F9';
+
+  const inputBorder =
+    isDarkTheme ? '#334155' : '#E2E8F0';
+
+  const textColor =
+    theme.text ||
+    (isDarkTheme ? '#F8FAFC' : '#0F172A');
+
+  const subTextColor =
+    isDarkTheme ? '#94A3B8' : '#64748B';
+
+  const primaryColor =
+    isDarkTheme ? '#38BDF8' : '#0284C7';
+
+  const primaryBtnBg =
+    isDarkTheme ? '#38BDF8' : '#0F172A';
+
+  const primaryBtnText =
+    isDarkTheme ? '#0F172A' : '#FFFFFF';
+
+  // ============================================================
   // RENDER
-  // ─────────────────────────────────────────────────────────────────
+  // ============================================================
   return (
     <SafeAreaView
       style={[
         styles.container,
-        { backgroundColor: theme.bg || (isDarkTheme ? '#0F172A' : '#F8FAFC') },
+        {
+          backgroundColor:
+            theme.bg ||
+            (isDarkTheme
+              ? '#0F172A'
+              : '#F8FAFC'),
+        },
       ]}
     >
       <StatusBar
-        barStyle={isDarkTheme ? 'light-content' : 'dark-content'}
+        barStyle={
+          isDarkTheme
+            ? 'light-content'
+            : 'dark-content'
+        }
         backgroundColor="transparent"
         translucent
       />
 
-      {/* FIXED TOP HEADER AREA */}
-      <View style={[styles.headerContainer, { borderBottomColor: inputBorder }]}>
+      {/* HEADER */}
+      <View
+        style={[
+          styles.headerContainer,
+          {
+            borderBottomColor:
+              inputBorder,
+          },
+        ]}
+      >
         <TouchableOpacity
           style={styles.backIconButton}
-          onPress={() => navigation.goBack()}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          onPress={() => {
+            if (step === 'name') {
+              setStep('members');
+            } else {
+              navigation.goBack();
+            }
+          }}
+          hitSlop={{
+            top: 10,
+            bottom: 10,
+            left: 10,
+            right: 10,
+          }}
           activeOpacity={0.7}
         >
           <Icon
@@ -442,7 +593,13 @@ const CreateGroup = ({ navigation }) => {
         <View
           style={[
             styles.headerBox,
-            { backgroundColor: theme.headerBox || (isDarkTheme ? '#1E293B' : '#E2E8F0') },
+            {
+              backgroundColor:
+                theme.headerBox ||
+                (isDarkTheme
+                  ? '#1E293B'
+                  : '#E2E8F0'),
+            },
           ]}
         >
           <Text
@@ -451,7 +608,7 @@ const CreateGroup = ({ navigation }) => {
               { color: textColor },
             ]}
           >
-            CREATE GROUP
+            NEW GROUP
           </Text>
         </View>
 
@@ -463,13 +620,17 @@ const CreateGroup = ({ navigation }) => {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* STEP PROGRESS INDICATOR */}
+        {/* ========================================================
+            WHATSAPP STYLE PROGRESS
+        ======================================================== */}
         <View style={styles.progressContainer}>
           <View style={styles.progressRow}>
             {['1', '2'].map((number, index) => {
               const isActive =
-                (step === 'name' && index === 0) ||
-                (step === 'members' && index <= 1);
+                (step === 'members' &&
+                  index === 0) ||
+                (step === 'name' &&
+                  index <= 1);
 
               return (
                 <React.Fragment key={number}>
@@ -477,14 +638,23 @@ const CreateGroup = ({ navigation }) => {
                     style={[
                       styles.dot,
                       isActive
-                        ? { backgroundColor: primaryColor, shadowColor: primaryColor }
+                        ? {
+                            backgroundColor:
+                              primaryColor,
+                            shadowColor:
+                              primaryColor,
+                          }
                         : styles.dotInactive,
                     ]}
                   >
                     <Text
                       style={[
                         styles.dotText,
-                        isActive ? { color: '#FFFFFF' } : { color: subTextColor },
+                        {
+                          color: isActive
+                            ? '#FFFFFF'
+                            : subTextColor,
+                        },
                       ]}
                     >
                       {number}
@@ -495,8 +665,11 @@ const CreateGroup = ({ navigation }) => {
                     <View
                       style={[
                         styles.dotLine,
-                        step === 'members'
-                          ? { backgroundColor: primaryColor }
+                        step === 'name'
+                          ? {
+                              backgroundColor:
+                                primaryColor,
+                            }
                           : styles.dotLineInactive,
                       ]}
                     />
@@ -510,86 +683,36 @@ const CreateGroup = ({ navigation }) => {
             <Text
               style={[
                 styles.progressLabel,
-                { color: step === 'name' ? primaryColor : subTextColor },
+                {
+                  color:
+                    step === 'members'
+                      ? primaryColor
+                      : subTextColor,
+                },
               ]}
             >
-              Group Name
+              Select Members
             </Text>
 
             <Text
               style={[
                 styles.progressLabel,
-                { color: step === 'members' ? primaryColor : subTextColor },
-              ]}
-            >
-              Add Members
-            </Text>
-          </View>
-        </View>
-
-        {/* ───────────────── STEP 1 ───────────────── */}
-        {step === 'name' && (
-          <View style={[styles.card, { backgroundColor: cardBg }]}>
-            <Text style={[styles.cardHeaderTitle, { color: textColor }]}>
-              Group Details
-            </Text>
-            <Text style={[styles.cardSubTitle, { color: subTextColor }]}>
-              Give your new group a clear name to organize tasks and communications.
-            </Text>
-
-            <Text
-              style={[
-                styles.fieldLabel,
-                { color: textColor },
+                {
+                  color:
+                    step === 'name'
+                      ? primaryColor
+                      : subTextColor,
+                },
               ]}
             >
               Group Name
             </Text>
-
-            <TextInput
-              value={groupName}
-              onChangeText={setGroupName}
-              placeholder="e.g. Family, FYP, Friends..."
-              placeholderTextColor="#94A3B8"
-              style={[
-                styles.input,
-                {
-                  color: textColor,
-                  backgroundColor: inputBg,
-                  borderColor: inputBorder,
-                },
-              ]}
-              autoFocus
-            />
-
-            <TouchableOpacity
-              style={[
-                styles.primaryBtn,
-                { backgroundColor: primaryBtnBg },
-                !groupName.trim() && styles.btnDisabled,
-              ]}
-              onPress={() => {
-                if (!groupName.trim()) {
-                  Alert.alert(
-                    'Error',
-                    'Enter a group name.'
-                  );
-                  return;
-                }
-
-                setStep('members');
-              }}
-              disabled={!groupName.trim()}
-              activeOpacity={0.8}
-            >
-              <Text style={[styles.primaryBtnText, { color: primaryBtnText }]}>
-                NEXT: Add Members →
-              </Text>
-            </TouchableOpacity>
           </View>
-        )}
+        </View>
 
-        {/* ───────────────── STEP 2 ───────────────── */}
+        {/* ========================================================
+            STEP 1 - SELECT MEMBERS
+        ======================================================== */}
         {step === 'members' && (
           <>
             <View style={styles.sectionHeaderBox}>
@@ -599,14 +722,254 @@ const CreateGroup = ({ navigation }) => {
                   { color: textColor },
                 ]}
               >
-                Add Members to "{groupName}"
+                Add Group Members
               </Text>
-              <Text style={[styles.sectionSubtitle, { color: subTextColor }]}>
-                Add people manually or select from your existing contact lists.
+
+              <Text
+                style={[
+                  styles.sectionSubtitle,
+                  { color: subTextColor },
+                ]}
+              >
+                Select the people you want to add to this group.
               </Text>
             </View>
 
-            {/* MANUAL ENTRY CARD */}
+            {/* SELECTED MEMBERS TOP SUMMARY */}
+            <View
+              style={[
+                styles.selectedSummary,
+                {
+                  backgroundColor: cardBg,
+                  borderColor: inputBorder,
+                },
+              ]}
+            >
+              <View
+                style={[
+                  styles.summaryIcon,
+                  {
+                    backgroundColor:
+                      primaryColor + '20',
+                  },
+                ]}
+              >
+                <Icon
+                  name="people"
+                  size={22}
+                  color={primaryColor}
+                />
+              </View>
+
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={[
+                    styles.summaryTitle,
+                    { color: textColor },
+                  ]}
+                >
+                  {members.length} Member
+                  {members.length === 1 ? '' : 's'} Selected
+                </Text>
+
+                <Text
+                  style={[
+                    styles.summaryText,
+                    { color: subTextColor },
+                  ]}
+                >
+                  {members.length > 0
+                    ? 'Continue when you have selected everyone.'
+                    : 'Select at least one member to continue.'}
+                </Text>
+              </View>
+            </View>
+
+            {/* EXISTING CONTACTS */}
+            <TouchableOpacity
+              style={[
+                styles.secondaryBtn,
+                {
+                  borderColor: primaryColor,
+                  backgroundColor: cardBg,
+                },
+              ]}
+              onPress={() =>
+                setShowContacts(!showContacts)
+              }
+              activeOpacity={0.7}
+            >
+              <Icon
+                name="people-outline"
+                size={21}
+                color={primaryColor}
+              />
+
+              <Text
+                style={[
+                  styles.secondaryBtnText,
+                  { color: textColor },
+                ]}
+              >
+                {showContacts
+                  ? 'Hide Contacts'
+                  : 'Select from Existing Contacts'}
+              </Text>
+
+              <Icon
+                name={
+                  showContacts
+                    ? 'chevron-up'
+                    : 'chevron-down'
+                }
+                size={18}
+                color={subTextColor}
+              />
+            </TouchableOpacity>
+
+            {showContacts && (
+              <View
+                style={[
+                  styles.contactDropdown,
+                  {
+                    backgroundColor: cardBg,
+                    borderColor: inputBorder,
+                  },
+                ]}
+              >
+                {loadingContacts ? (
+                  <ActivityIndicator
+                    size="small"
+                    color={primaryColor}
+                    style={{ padding: 18 }}
+                  />
+                ) : existingContacts.length === 0 ? (
+                  <Text
+                    style={[
+                      styles.emptyText,
+                      { color: subTextColor },
+                    ]}
+                  >
+                    No existing contacts found.
+                  </Text>
+                ) : (
+                  existingContacts.map(
+                    (contact, idx) => {
+                      const selected =
+                        members.some(
+                          member =>
+                            contact.userId &&
+                            member.userId &&
+                            String(
+                              member.userId
+                            ) ===
+                              String(
+                                contact.userId
+                              )
+                        );
+
+                      return (
+                        <TouchableOpacity
+                          key={contact.id}
+                          style={[
+                            styles.contactRow,
+                            idx !==
+                              existingContacts.length -
+                                1 && {
+                              borderBottomColor:
+                                inputBorder,
+                            },
+                          ]}
+                          onPress={() => {
+                            if (!selected) {
+                              addFromExisting(
+                                contact
+                              );
+                            }
+                          }}
+                          activeOpacity={0.7}
+                        >
+                          <View
+                            style={[
+                              styles.contactAvatar,
+                              {
+                                backgroundColor:
+                                  primaryColor +
+                                  '20',
+                              },
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.avatarText,
+                                {
+                                  color:
+                                    primaryColor,
+                                },
+                              ]}
+                            >
+                              {contact.name
+                                ? contact.name
+                                    .charAt(0)
+                                    .toUpperCase()
+                                : '?'}
+                            </Text>
+                          </View>
+
+                          <View
+                            style={{
+                              flex: 1,
+                              paddingRight: 8,
+                            }}
+                          >
+                            <Text
+                              style={[
+                                styles.contactName,
+                                { color: textColor },
+                              ]}
+                              numberOfLines={1}
+                            >
+                              {contact.name}
+                            </Text>
+
+                            {contact.phone ? (
+                              <Text
+                                style={[
+                                  styles.contactPhone,
+                                  {
+                                    color:
+                                      subTextColor,
+                                  },
+                                ]}
+                                numberOfLines={1}
+                              >
+                                {contact.phone}
+                              </Text>
+                            ) : null}
+                          </View>
+
+                          <Icon
+                            name={
+                              selected
+                                ? 'checkmark-circle'
+                                : 'add-circle-outline'
+                            }
+                            size={25}
+                            color={
+                              selected
+                                ? '#22C55E'
+                                : primaryColor
+                            }
+                          />
+                        </TouchableOpacity>
+                      );
+                    }
+                  )
+                )}
+              </View>
+            )}
+
+            {/* MANUAL MEMBER */}
             <View
               style={[
                 styles.card,
@@ -619,7 +982,7 @@ const CreateGroup = ({ navigation }) => {
                   { color: textColor },
                 ]}
               >
-                ➕ Add by Name & Phone
+                Add Person Manually
               </Text>
 
               <TextInput
@@ -656,143 +1019,31 @@ const CreateGroup = ({ navigation }) => {
               />
 
               <TouchableOpacity
-                style={[styles.addMemberBtn, { backgroundColor: primaryColor }]}
+                style={[
+                  styles.addMemberBtn,
+                  {
+                    backgroundColor:
+                      primaryColor,
+                  },
+                ]}
                 onPress={addMemberManually}
                 activeOpacity={0.8}
               >
                 <Icon
                   name="person-add"
-                  size={16}
+                  size={17}
                   color="#FFFFFF"
                 />
-                <Text style={styles.addMemberBtnText}>
-                  Add to List
+
+                <Text
+                  style={styles.addMemberBtnText}
+                >
+                  Add Member
                 </Text>
               </TouchableOpacity>
             </View>
 
-            {/* EXISTING CONTACTS TOGGLE */}
-            <TouchableOpacity
-              style={[
-                styles.secondaryBtn,
-                { borderColor: primaryColor, backgroundColor: cardBg },
-              ]}
-              onPress={() =>
-                setShowContacts(!showContacts)
-              }
-              activeOpacity={0.7}
-            >
-              <Icon
-                name="people-outline"
-                size={20}
-                color={primaryColor}
-              />
-
-              <Text
-                style={[
-                  styles.secondaryBtnText,
-                  { color: textColor },
-                ]}
-              >
-                {showContacts
-                  ? 'Hide Existing Contacts'
-                  : 'Pick from Existing Contacts'}
-              </Text>
-
-              <Icon
-                name={
-                  showContacts
-                    ? 'chevron-up'
-                    : 'chevron-down'
-                }
-                size={18}
-                color={subTextColor}
-              />
-            </TouchableOpacity>
-
-            {showContacts && (
-              <View
-                style={[
-                  styles.contactDropdown,
-                  { backgroundColor: cardBg, borderColor: inputBorder },
-                ]}
-              >
-                {loadingContacts ? (
-                  <ActivityIndicator
-                    size="small"
-                    color={primaryColor}
-                    style={{ padding: 18 }}
-                  />
-                ) : existingContacts.length === 0 ? (
-                  <Text
-                    style={[
-                      styles.emptyText,
-                      { color: subTextColor },
-                    ]}
-                  >
-                    No existing contacts found.
-                  </Text>
-                ) : (
-                  existingContacts.map((contact, idx) => (
-                    <TouchableOpacity
-                      key={contact.id}
-                      style={[
-                        styles.contactRow,
-                        idx !== existingContacts.length - 1 && { borderBottomColor: inputBorder },
-                      ]}
-                      onPress={() =>
-                        addFromExisting(contact)
-                      }
-                      activeOpacity={0.7}
-                    >
-                      <View
-                        style={[styles.contactAvatar, { backgroundColor: primaryColor + '20' }]}
-                      >
-                        <Text
-                          style={[styles.avatarText, { color: primaryColor }]}
-                        >
-                          {contact.name
-                            ? contact.name.charAt(0).toUpperCase()
-                            : '?'}
-                        </Text>
-                      </View>
-
-                      <View style={{ flex: 1, paddingRight: 8 }}>
-                        <Text
-                          style={[
-                            styles.contactName,
-                            { color: textColor },
-                          ]}
-                          numberOfLines={1}
-                        >
-                          {contact.name}
-                        </Text>
-
-                        {contact.phone ? (
-                          <Text
-                            style={[
-                              styles.contactPhone,
-                              { color: subTextColor },
-                            ]}
-                            numberOfLines={1}
-                          >
-                            {contact.phone}
-                          </Text>
-                        ) : null}
-                      </View>
-
-                      <Icon
-                        name="add-circle-outline"
-                        size={24}
-                        color={primaryColor}
-                      />
-                    </TouchableOpacity>
-                  ))
-                )}
-              </View>
-            )}
-
-            {/* CURRENT MEMBERS SECTION */}
+            {/* SELECTED MEMBERS */}
             {members.length > 0 && (
               <View style={styles.membersSection}>
                 <Text
@@ -801,7 +1052,7 @@ const CreateGroup = ({ navigation }) => {
                     { color: textColor },
                   ]}
                 >
-                  Added Members ({members.length})
+                  Selected Members ({members.length})
                 </Text>
 
                 {members.map(member => (
@@ -809,18 +1060,43 @@ const CreateGroup = ({ navigation }) => {
                     key={member.id}
                     style={[
                       styles.memberRow,
-                      { backgroundColor: cardBg, borderColor: inputBorder },
+                      {
+                        backgroundColor: cardBg,
+                        borderColor: inputBorder,
+                      },
                     ]}
                   >
-                    <View style={[styles.memberAvatar, { backgroundColor: isDarkTheme ? '#334155' : '#E2E8F0' }]}>
-                      <Text style={[styles.avatarText, { color: textColor }]}>
+                    <View
+                      style={[
+                        styles.memberAvatar,
+                        {
+                          backgroundColor:
+                            isDarkTheme
+                              ? '#334155'
+                              : '#E2E8F0',
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.avatarText,
+                          { color: textColor },
+                        ]}
+                      >
                         {member.name
-                          ? member.name.charAt(0).toUpperCase()
+                          ? member.name
+                              .charAt(0)
+                              .toUpperCase()
                           : '?'}
                       </Text>
                     </View>
 
-                    <View style={{ flex: 1, paddingRight: 8 }}>
+                    <View
+                      style={{
+                        flex: 1,
+                        paddingRight: 8,
+                      }}
+                    >
                       <Text
                         style={[
                           styles.memberName,
@@ -831,8 +1107,17 @@ const CreateGroup = ({ navigation }) => {
                         {member.name}
                       </Text>
 
-                      <Text style={[styles.memberPhone, { color: subTextColor }]} numberOfLines={1}>
-                        {member.phone}
+                      <Text
+                        style={[
+                          styles.memberPhone,
+                          { color: subTextColor },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {member.phone ||
+                          (member.isRegistered
+                            ? 'Registered member'
+                            : 'External member')}
                       </Text>
                     </View>
 
@@ -841,12 +1126,17 @@ const CreateGroup = ({ navigation }) => {
                       onPress={() =>
                         removeMember(member.id)
                       }
-                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      hitSlop={{
+                        top: 10,
+                        bottom: 10,
+                        left: 10,
+                        right: 10,
+                      }}
                       activeOpacity={0.7}
                     >
                       <Icon
-                        name="trash-outline"
-                        size={20}
+                        name="close-circle"
+                        size={22}
                         color="#EF4444"
                       />
                     </TouchableOpacity>
@@ -855,10 +1145,28 @@ const CreateGroup = ({ navigation }) => {
               </View>
             )}
 
-            {/* EMPTY MEMBERS STATE */}
+            {/* EMPTY STATE */}
             {members.length === 0 && (
-              <View style={[styles.emptyMembers, { backgroundColor: cardBg, borderColor: inputBorder }]}>
-                <View style={[styles.emptyIconBg, { backgroundColor: isDarkTheme ? '#1E293B' : '#F1F5F9' }]}>
+              <View
+                style={[
+                  styles.emptyMembers,
+                  {
+                    backgroundColor: cardBg,
+                    borderColor: inputBorder,
+                  },
+                ]}
+              >
+                <View
+                  style={[
+                    styles.emptyIconBg,
+                    {
+                      backgroundColor:
+                        isDarkTheme
+                          ? '#1E293B'
+                          : '#F1F5F9',
+                    },
+                  ]}
+                >
                   <Icon
                     name="people-outline"
                     size={32}
@@ -866,24 +1174,331 @@ const CreateGroup = ({ navigation }) => {
                   />
                 </View>
 
-                <Text style={[styles.emptyMembersTitle, { color: textColor }]}>
-                  No members added yet
+                <Text
+                  style={[
+                    styles.emptyMembersTitle,
+                    { color: textColor },
+                  ]}
+                >
+                  No members selected
                 </Text>
-                <Text style={[styles.emptyMembersText, { color: subTextColor }]}>
-                  You can add members using the fields above, or skip and create the group directly.
+
+                <Text
+                  style={[
+                    styles.emptyMembersText,
+                    { color: subTextColor },
+                  ]}
+                >
+                  Select existing contacts or add someone manually.
                 </Text>
               </View>
             )}
 
+            {/* NEXT BUTTON */}
+            <TouchableOpacity
+              style={[
+                styles.primaryBtn,
+                {
+                  backgroundColor:
+                    primaryBtnBg,
+                },
+                members.length === 0 &&
+                  styles.btnDisabled,
+              ]}
+              onPress={goToGroupName}
+              disabled={members.length === 0}
+              activeOpacity={0.8}
+            >
+              <Text
+                style={[
+                  styles.primaryBtnText,
+                  { color: primaryBtnText },
+                ]}
+              >
+                NEXT: GROUP NAME →
+              </Text>
+            </TouchableOpacity>
+          </>
+        )}
+
+        {/* ========================================================
+            STEP 2 - GROUP NAME
+        ======================================================== */}
+        {step === 'name' && (
+          <>
+            <View style={styles.sectionHeaderBox}>
+              <Text
+                style={[
+                  styles.sectionTitle,
+                  { color: textColor },
+                ]}
+              >
+                Group Details
+              </Text>
+
+              <Text
+                style={[
+                  styles.sectionSubtitle,
+                  { color: subTextColor },
+                ]}
+              >
+                Choose a name for your new group.
+              </Text>
+            </View>
+
+            {/* SELECTED MEMBERS PREVIEW */}
+            <View
+              style={[
+                styles.previewCard,
+                {
+                  backgroundColor: cardBg,
+                  borderColor: inputBorder,
+                },
+              ]}
+            >
+              <View
+                style={styles.previewHeader}
+              >
+                <View
+                  style={[
+                    styles.summaryIcon,
+                    {
+                      backgroundColor:
+                        primaryColor + '20',
+                    },
+                  ]}
+                >
+                  <Icon
+                    name="people"
+                    size={21}
+                    color={primaryColor}
+                  />
+                </View>
+
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={[
+                      styles.summaryTitle,
+                      { color: textColor },
+                    ]}
+                  >
+                    {members.length} Member
+                    {members.length === 1
+                      ? ''
+                      : 's'}
+                  </Text>
+
+                  <Text
+                    style={[
+                      styles.summaryText,
+                      { color: subTextColor },
+                    ]}
+                  >
+                    Added to this group
+                  </Text>
+                </View>
+
+                <TouchableOpacity
+                  onPress={() =>
+                    setStep('members')
+                  }
+                  activeOpacity={0.7}
+                >
+                  <Text
+                    style={[
+                      styles.changeText,
+                      { color: primaryColor },
+                    ]}
+                  >
+                    Change
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <View
+                style={[
+                  styles.previewMembers,
+                  {
+                    borderTopColor:
+                      inputBorder,
+                  },
+                ]}
+              >
+                {members.slice(0, 5).map(member => (
+                  <View
+                    key={member.id}
+                    style={styles.previewMember}
+                  >
+                    <View
+                      style={[
+                        styles.smallAvatar,
+                        {
+                          backgroundColor:
+                            primaryColor + '20',
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.smallAvatarText,
+                          {
+                            color:
+                              primaryColor,
+                          },
+                        ]}
+                      >
+                        {member.name
+                          ? member.name
+                              .charAt(0)
+                              .toUpperCase()
+                          : '?'}
+                      </Text>
+                    </View>
+
+                    <Text
+                      style={[
+                        styles.previewMemberName,
+                        { color: textColor },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {member.name}
+                    </Text>
+                  </View>
+                ))}
+
+                {members.length > 5 && (
+                  <View
+                    style={[
+                      styles.moreMembers,
+                      {
+                        backgroundColor:
+                          inputBg,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.moreMembersText,
+                        { color: subTextColor },
+                      ]}
+                    >
+                      +{members.length - 5}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </View>
+
+            {/* GROUP NAME CARD */}
+            <View
+              style={[
+                styles.card,
+                { backgroundColor: cardBg },
+              ]}
+            >
+              <View
+                style={styles.groupIconContainer}
+              >
+                <View
+                  style={[
+                    styles.groupIcon,
+                    {
+                      backgroundColor:
+                        primaryColor + '20',
+                    },
+                  ]}
+                >
+                  <Icon
+                    name="people"
+                    size={34}
+                    color={primaryColor}
+                  />
+                </View>
+              </View>
+
+              <Text
+                style={[
+                  styles.cardHeaderTitle,
+                  {
+                    color: textColor,
+                    textAlign: 'center',
+                  },
+                ]}
+              >
+                Name Your Group
+              </Text>
+
+              <Text
+                style={[
+                  styles.cardSubTitle,
+                  {
+                    color: subTextColor,
+                    textAlign: 'center',
+                  },
+                ]}
+              >
+                Enter a name that everyone in the group can recognize.
+              </Text>
+
+              <Text
+                style={[
+                  styles.fieldLabel,
+                  { color: textColor },
+                ]}
+              >
+                Group Name
+              </Text>
+
+              <TextInput
+                value={groupName}
+                onChangeText={setGroupName}
+                placeholder="e.g. Family, FYP, Friends..."
+                placeholderTextColor="#94A3B8"
+                style={[
+                  styles.input,
+                  {
+                    color: textColor,
+                    backgroundColor: inputBg,
+                    borderColor: inputBorder,
+                  },
+                ]}
+                autoFocus
+                maxLength={50}
+              />
+
+              <Text
+                style={[
+                  styles.characterCount,
+                  { color: subTextColor },
+                ]}
+              >
+                {groupName.length}/50
+              </Text>
+            </View>
+
             {/* ACTION BUTTONS */}
             <View style={styles.actionRow}>
               <TouchableOpacity
-                style={[styles.backBtn, { borderColor: inputBorder, backgroundColor: cardBg }]}
-                onPress={() => setStep('name')}
+                style={[
+                  styles.backBtn,
+                  {
+                    borderColor: inputBorder,
+                    backgroundColor: cardBg,
+                  },
+                ]}
+                onPress={() =>
+                  setStep('members')
+                }
                 activeOpacity={0.8}
               >
-                <Text style={[styles.backBtnText, { color: textColor }]}>
-                  ← Back
+                <Text
+                  style={[
+                    styles.backBtnText,
+                    { color: textColor },
+                  ]}
+                >
+                  ← Members
                 </Text>
               </TouchableOpacity>
 
@@ -894,20 +1509,48 @@ const CreateGroup = ({ navigation }) => {
                     flex: 1,
                     marginLeft: 12,
                     marginTop: 0,
-                    backgroundColor: primaryBtnBg,
+                    backgroundColor:
+                      primaryBtnBg,
                   },
-                  loading && styles.btnDisabled,
+                  (!groupName.trim() ||
+                    loading) &&
+                    styles.btnDisabled,
                 ]}
                 onPress={createGroup}
-                disabled={loading}
+                disabled={
+                  !groupName.trim() ||
+                  loading
+                }
                 activeOpacity={0.8}
               >
                 {loading ? (
-                  <ActivityIndicator color={primaryBtnText} size="small" />
+                  <ActivityIndicator
+                    color={primaryBtnText}
+                    size="small"
+                  />
                 ) : (
-                  <Text style={[styles.primaryBtnText, { color: primaryBtnText }]}>
-                    CREATE GROUP
-                  </Text>
+                  <View
+                    style={styles.createButtonContent}
+                  >
+                    <Icon
+                      name="checkmark-circle"
+                      size={19}
+                      color={primaryBtnText}
+                    />
+
+                    <Text
+                      style={[
+                        styles.primaryBtnText,
+                        {
+                          color:
+                            primaryBtnText,
+                          marginLeft: 7,
+                        },
+                      ]}
+                    >
+                      CREATE GROUP
+                    </Text>
+                  </View>
                 )}
               </TouchableOpacity>
             </View>
@@ -915,17 +1558,25 @@ const CreateGroup = ({ navigation }) => {
         )}
       </ScrollView>
 
-      {/* BOTTOM NAV CONTROL */}
+      {/* BOTTOM NAVIGATION */}
       <View
         style={[
           styles.bottom,
-          { backgroundColor: theme.bottomNav || (isDarkTheme ? '#0F172A' : '#1E293B') },
+          {
+            backgroundColor:
+              theme.bottomNav ||
+              (isDarkTheme
+                ? '#0F172A'
+                : '#1E293B'),
+          },
         ]}
       >
         <TouchableOpacity
           style={styles.iconBtn}
           onPress={() =>
-            navigation.navigate('HomeDashboard')
+            navigation.navigate(
+              'HomeDashboard'
+            )
           }
           activeOpacity={0.7}
         >
@@ -969,7 +1620,9 @@ const CreateGroup = ({ navigation }) => {
         <TouchableOpacity
           style={styles.iconBtn}
           onPress={() =>
-            navigation.navigate('SettingScreen')
+            navigation.navigate(
+              'SettingScreen'
+            )
           }
           activeOpacity={0.7}
         >
@@ -991,9 +1644,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  /* HEADER STYLING */
   headerContainer: {
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 8 : 12,
+    paddingTop:
+      Platform.OS === 'android'
+        ? (StatusBar.currentHeight || 24) + 8
+        : 12,
     paddingBottom: 12,
     paddingHorizontal: 16,
     flexDirection: 'row',
@@ -1007,12 +1662,12 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    justify: 'center',
+    justifyContent: 'center',
     alignItems: 'center',
   },
 
   headerBox: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 18,
     paddingVertical: 8,
     borderRadius: 20,
   },
@@ -1023,14 +1678,12 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
   },
 
-  /* CONTENT WRAPPER */
   content: {
     paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 110,
   },
 
-  /* PROGRESS TRACKER */
   progressContainer: {
     marginBottom: 20,
     alignItems: 'center',
@@ -1050,7 +1703,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 2,
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
     shadowOpacity: 0.15,
     shadowRadius: 3,
   },
@@ -1078,7 +1734,7 @@ const styles = StyleSheet.create({
   progressLabels: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    width: width * 0.55,
+    width: width * 0.68,
   },
 
   progressLabel: {
@@ -1086,19 +1742,52 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  /* SECTION & CARDS */
   sectionHeaderBox: {
     marginBottom: 14,
   },
 
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '700',
   },
 
   sectionSubtitle: {
     fontSize: 13,
+    marginTop: 4,
+    lineHeight: 19,
+  },
+
+  selectedSummary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 14,
+    marginBottom: 14,
+  },
+
+  summaryIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+
+  summaryTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+
+  summaryText: {
+    fontSize: 12,
     marginTop: 2,
+  },
+
+  changeText: {
+    fontSize: 12,
+    fontWeight: '700',
   },
 
   card: {
@@ -1107,7 +1796,10 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     elevation: 2,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
     shadowOpacity: 0.05,
     shadowRadius: 6,
   },
@@ -1121,6 +1813,7 @@ const styles = StyleSheet.create({
   cardSubTitle: {
     fontSize: 13,
     marginBottom: 16,
+    lineHeight: 18,
   },
 
   cardTitle: {
@@ -1143,7 +1836,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
 
-  /* BUTTONS */
+  characterCount: {
+    fontSize: 10,
+    textAlign: 'right',
+    marginTop: 5,
+  },
+
   primaryBtn: {
     borderRadius: 12,
     height: 48,
@@ -1152,15 +1850,24 @@ const styles = StyleSheet.create({
     marginTop: 16,
     elevation: 2,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
 
   primaryBtnText: {
     fontWeight: '700',
-    fontSize: 14,
+    fontSize: 13,
     letterSpacing: 0.5,
+  },
+
+  createButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   btnDisabled: {
@@ -1200,7 +1907,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
 
-  /* CONTACT DROPDOWN */
   contactDropdown: {
     borderRadius: 14,
     borderWidth: 1,
@@ -1246,7 +1952,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
 
-  /* MEMBERS LIST */
   membersSection: {
     marginTop: 4,
     marginBottom: 16,
@@ -1290,7 +1995,6 @@ const styles = StyleSheet.create({
     padding: 6,
   },
 
-  /* EMPTY STATE */
   emptyMembers: {
     borderRadius: 16,
     borderWidth: 1,
@@ -1322,7 +2026,83 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
 
-  /* ACTIONS ROW */
+  previewCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 16,
+    overflow: 'hidden',
+  },
+
+  previewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+  },
+
+  previewMembers: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    padding: 12,
+    borderTopWidth: 1,
+  },
+
+  previewMember: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 12,
+    marginBottom: 6,
+    maxWidth: width * 0.38,
+  },
+
+  smallAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 6,
+  },
+
+  smallAvatarText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+
+  previewMemberName: {
+    fontSize: 11,
+    fontWeight: '600',
+    flexShrink: 1,
+  },
+
+  moreMembers: {
+    minWidth: 32,
+    height: 28,
+    paddingHorizontal: 8,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  moreMembersText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+
+  groupIconContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+
+  groupIcon: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
   actionRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1343,20 +2123,28 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
 
-  /* BOTTOM NAVIGATION BAR */
   bottom: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    height: Platform.OS === 'ios' ? 74 : 60,
-    paddingBottom: Platform.OS === 'ios' ? 16 : 0,
+    height:
+      Platform.OS === 'ios'
+        ? 74
+        : 60,
+    paddingBottom:
+      Platform.OS === 'ios'
+        ? 16
+        : 0,
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
     elevation: 10,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: -3 },
+    shadowOffset: {
+      width: 0,
+      height: -3,
+    },
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
@@ -1368,8 +2156,6 @@ const styles = StyleSheet.create({
     height: '100%',
   },
 });
-
-
 
 
 
