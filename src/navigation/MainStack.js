@@ -1,0 +1,75 @@
+
+import React from 'react';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+
+// DASHBOARDS
+import HomeDashboard from '../screens/Tasks/HomeDashboard';
+import GroupDashboard from '../screens/Tasks/GroupDashboard';  // ← single dynamic dashboard
+
+// TASK SCREENS
+import AddTaskTimeBased from '../screens/Managment/AddTaskTimeBased';
+import AddTaskNonTimeBased from '../screens/Managment/AddTaskNonTimeBased';
+import EditTaskTimeBased from '../screens/Managment/EditTaskTimeBased';
+import EditTaskNonTimeBased from '../screens/Managment/EditTaskNonTimeBased';
+import TaskOverviewScreen from '../screens/Tasks/TaskOverviewScreen';
+import ClashTaskScreen from '../screens/Tasks/ClashTaskScreen';
+
+// GROUP
+import AddMember from '../screens/Managment/AddMember';
+import CreateGroup from '../screens/Managment/CreateGroup';
+import TaskGroupOverviewScreen from '../screens/Tasks/TaskGroupOverviewScreen';
+
+// FORWARD / CONTACT
+import ForwardTaskTo from '../screens/Managment/ForwardTaskTo';
+import ContactScreen from '../screens/User/ContactScreen';
+
+// HISTORY
+import TimeBasedHistoryScreen from '../screens/User/TimeBasedHistoryScreen';
+import NonTimeBasedHistoryScreen from '../screens/Tasks/NonTimeBasedHistoryScreen';
+
+// REMINDER
+import ReminderAlarmScreen from '../screens/Tasks/ReminderAlarmScreen';
+
+// NOTIFICATION
+import NotificationScreen from '../screens/User/NotificationScreen';
+
+// SETTINGS
+import SettingScreen from '../screens/User/SettingScreen';
+
+const Stack = createNativeStackNavigator();
+
+const MainStack = () => {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+
+      <Stack.Screen name="HomeDashboard" component={HomeDashboard} />
+      <Stack.Screen name="GroupDashboard" component={GroupDashboard} />
+
+      <Stack.Screen name="AddTaskTimeBased" component={AddTaskTimeBased} />
+      <Stack.Screen name="AddTaskNonTimeBased" component={AddTaskNonTimeBased} />
+
+      <Stack.Screen name="EditTaskTimeBased" component={EditTaskTimeBased} />
+      <Stack.Screen name="EditTaskNonTimeBased" component={EditTaskNonTimeBased} />
+
+      <Stack.Screen name="TaskOverviewScreen" component={TaskOverviewScreen} />
+      <Stack.Screen name="ClashTaskScreen" component={ClashTaskScreen} />
+
+      <Stack.Screen name="AddMember" component={AddMember} />
+      <Stack.Screen name="CreateGroup" component={CreateGroup} />
+      <Stack.Screen name="TaskGroupOverviewScreen" component={TaskGroupOverviewScreen} />
+
+      <Stack.Screen name="ForwardTaskTo" component={ForwardTaskTo} />
+      <Stack.Screen name="ContactScreen" component={ContactScreen} />
+
+      <Stack.Screen name="TimeBasedHistoryScreen" component={TimeBasedHistoryScreen} />
+      <Stack.Screen name="NonTimeBasedHistoryScreen" component={NonTimeBasedHistoryScreen} />
+
+      <Stack.Screen name="ReminderAlarmScreen" component={ReminderAlarmScreen} />
+      <Stack.Screen name="NotificationScreen" component={NotificationScreen} />
+      <Stack.Screen name="SettingScreen" component={SettingScreen} />
+
+    </Stack.Navigator>
+  );
+};
+
+export default MainStack;

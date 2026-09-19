@@ -1,0 +1,365 @@
+npm install @react-navigation/native
+npm install @react-navigation/stack
+npm install react-native-safe-area-context
+npm install react-native-screens
+npm install react-native-gesture-handler
+npm install react-native-reanimated
+npm install react-native-vector-icons
+npm install @react-navigation/native-stack
+npm install @react-navigation/bottom-tabs
+npm install react-native-screens react-native-safe-area-context react-native-gesture-handler react-native-reanimated react-native-vector-icons react-native-svg
+npm install react-native-linear-gradient
+npm install @react-navigation/native @react-navigation/native-stack @react-navigation/bottom-tabs
+npm install react-native-screens react-native-safe-area-context react-native-gesture-handler react-native-reanimated
+npm install react-native-vector-icons react-native-linear-gradient
+npm install react-native-shadow-2
+npm install react-native-vector-icons react-native-linear-gradient react-native-shadow-2
+npm install @react-navigation/native @react-navigation/native-stack
+npm install react-native-safe-area-context react-native-screens react-native-gesture-handler react-native-reanimated
+npm install react-native-vector-icons @react-native-community/datetimepicker
+npm install react-native-modal react-native-element-dropdown
+npm install react-native-element-dropdown react-native-modal
+npm install react-native-vector-icons react-native-element-dropdown
+npm install react-native-svg
+npm install react-native-screens react-native-safe-area-context
+npm install react-native-gesture-handler react-native-reanimated
+npm install @react-native-async-storage/async-storage
+npm install react-native-push-notification
+npm install @react-native-community/datetimepicker
+npm install @react-native-community/switch
+
+
+
+npm install @react-native-async-storage/async-storage
+npm install react-native-worklets
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+npm install @react-navigation/native
+npm install @react-navigation/stack
+npm install react-native-safe-area-context
+npm install react-native-screens
+npm install react-native-gesture-handler
+npm install react-native-reanimated
+npm install react-native-vector-icons
+
+npm install @react-navigation/native
+npm install @react-navigation/native-stack
+npm install @react-navigation/bottom-tabs
+npm install react-native-screens react-native-safe-area-context react-native-gesture-handler react-native-reanimated react-native-vector-icons react-native-svg
+npm install react-native-linear-gradient
+
+
+npm install @react-navigation/native @react-navigation/native-stack @react-navigation/bottom-tabs
+npm install react-native-screens react-native-safe-area-context react-native-gesture-handler react-native-reanimated
+npm install react-native-vector-icons react-native-linear-gradient
+npm install react-native-shadow-2
+
+
+
+npm install @react-navigation/native @react-navigation/native-stack @react-navigation/bottom-tabs
+npm install react-native-screens react-native-safe-area-context react-native-gesture-handler react-native-reanimated
+npm install react-native-vector-icons react-native-linear-gradient react-native-shadow-2
+
+
+
+npm install @react-navigation/native @react-navigation/native-stack
+npm install react-native-safe-area-context react-native-screens react-native-gesture-handler react-native-reanimated
+npm install react-native-vector-icons @react-native-community/datetimepicker
+npm install react-native-modal react-native-element-dropdown
+
+
+
+npm install @react-navigation/native @react-navigation/native-stack
+npm install react-native-safe-area-context react-native-screens react-native-gesture-handler react-native-reanimated
+npm install react-native-vector-icons @react-native-community/datetimepicker
+npm install react-native-element-dropdown react-native-modal
+
+
+
+npm install @react-navigation/native @react-navigation/native-stack
+npm install react-native-safe-area-context react-native-screens react-native-gesture-handler react-native-reanimated
+npm install react-native-vector-icons @react-native-community/datetimepicker
+npm install react-native-element-dropdown react-native-modal
+
+
+npm install @react-navigation/native @react-navigation/native-stack
+npm install react-native-safe-area-context react-native-screens react-native-gesture-handler react-native-reanimated
+npm install react-native-vector-icons @react-native-community/datetimepicker
+npm install react-native-element-dropdown react-native-modal
+
+npm install @react-navigation/native @react-navigation/native-stack
+npm install react-native-safe-area-context react-native-screens react-native-gesture-handler react-native-reanimated
+npm install react-native-vector-icons
+
+npm install @react-navigation/native @react-navigation/native-stack
+npm install react-native-safe-area-context react-native-screens react-native-gesture-handler react-native-reanimated
+npm install react-native-vector-icons react-native-element-dropdown
+
+npm install @react-navigation/native @react-navigation/native-stack
+npm install react-native-safe-area-context react-native-screens react-native-gesture-handler react-native-reanimated
+npm install react-native-vector-icons
+
+
+npm install @react-navigation/native @react-navigation/native-stack
+npm install react-native-screens react-native-safe-area-context react-native-gesture-handler react-native-reanimated
+npm install react-native-vector-icons
+npm install react-native-svg
+
+
+npm install @react-navigation/native
+npm install @react-navigation/native-stack
+npm install react-native-screens react-native-safe-area-context
+npm install react-native-gesture-handler react-native-reanimated
+npm install react-native-vector-icons
+npm install @react-native-async-storage/async-storage
+npm install react-native-push-notification
+npm install @react-native-community/datetimepicker
+
+npm install @react-navigation/native
+npm install @react-navigation/native-stack
+npm install react-native-screens react-native-safe-area-context
+npm install react-native-gesture-handler react-native-reanimated
+npm install react-native-vector-icons
+npm install @react-native-async-storage/async-storage
+
+npm install @react-navigation/native
+npm install @react-navigation/native-stack
+npm install react-native-screens react-native-safe-area-context
+npm install react-native-gesture-handler react-native-reanimated
+npm install react-native-vector-icons
+npm install @react-native-async-storage/async-storage
+
+npm install @react-navigation/native
+npm install @react-navigation/native-stack
+npm install react-native-screens react-native-safe-area-context
+npm install react-native-gesture-handler react-native-reanimated
+npm install react-native-vector-icons
+npm install @react-native-async-storage/async-storage
+npm install react-native-linear-gradient
+
+npm install @react-navigation/native
+npm install @react-navigation/native-stack
+npm install react-native-screens react-native-safe-area-context
+npm install react-native-gesture-handler react-native-reanimated
+npm install react-native-vector-icons
+npm install @react-native-async-storage/async-storage
+
+npm install @react-navigation/native
+npm install @react-navigation/native-stack
+npm install react-native-screens react-native-safe-area-context
+npm install react-native-gesture-handler react-native-reanimated
+npm install react-native-vector-icons
+npm install @react-native-async-storage/async-storage
+
+npm install @react-navigation/native
+npm install @react-navigation/native-stack
+npm install react-native-screens react-native-safe-area-context
+npm install react-native-gesture-handler react-native-reanimated
+npm install react-native-vector-icons
+npm install @react-native-async-storage/async-storage
+
+npm install @react-navigation/native
+npm install @react-navigation/native-stack
+npm install react-native-screens react-native-safe-area-context
+npm install react-native-gesture-handler react-native-reanimated
+npm install react-native-vector-icons
+npm install @react-native-async-storage/async-storage
+
+npm install @react-navigation/native
+npm install @react-navigation/native-stack
+npm install react-native-screens react-native-safe-area-context
+npm install react-native-gesture-handler react-native-reanimated
+npm install react-native-vector-icons
+npm install @react-native-async-storage/async-storage
+npm install @react-native-community/switch
