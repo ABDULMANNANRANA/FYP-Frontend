@@ -10,7 +10,6 @@ import {
   ActivityIndicator,
   Alert,
   Platform,
-  Dimensions,
 } from 'react-native';
 import Icon from '@react-native-vector-icons/ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -18,11 +17,6 @@ import { useTheme } from '../../context/ThemeContext';
 import { useFocusEffect } from '@react-navigation/native';
 import { BASE_URL } from '../../config/api';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
-// ============================================================
-// Helper: reset navigation to the Login screen inside AuthStack.
-// ============================================================
 const goToLogin = navigation => {
   navigation.reset({
     index: 0,
@@ -44,16 +38,10 @@ const HomeDashboard = ({ navigation }) => {
   const [selectedMode, setSelectedMode] = useState('time');
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [allGroupNames, setAllGroupNames] = useState([]);
+  const [groups, setGroups] = useState([]);
 
   const tabs = ['ALL', 'TODAY', 'PENDING', 'UPCOMING'];
 
-  // SELF is always first; the rest come dynamically from the API
-  const categories = ['SELF', ...allGroupNames];
-
-  // ============================================================
-  // GET JWT TOKEN
-  // ============================================================
   const getToken = async () => {
     const token = await AsyncStorage.getItem('token');
 
@@ -75,9 +63,6 @@ const HomeDashboard = ({ navigation }) => {
     return token;
   };
 
-  // ============================================================
-  // FETCH GROUPS
-  // ============================================================
   const fetchGroups = async () => {
     try {
       const token = await getToken();
@@ -112,214 +97,204 @@ const HomeDashboard = ({ navigation }) => {
         return;
       }
 
-      if (response.ok && data?.success) {
-        const names = (data.data || [])
-          .map(group => group?.name)
-          .filter(Boolean)
-          .map(name => name.toUpperCase());
-
-        setAllGroupNames(names);
-      } else {
-        console.log(
-          'Fetch Groups Failed:',
+      if (!response.ok) {
+        throw new Error(
           data?.message || 'Failed to fetch groups'
         );
       }
+
+      if (data?.success) {
+        const groupList = Array.isArray(data.data)
+          ? data.data
+          : [];
+
+        const formattedGroups = groupList
+          .filter(group => group && group.name)
+          .map(group => ({
+            id: group.id ?? group.groupId ?? null,
+            name: String(group.name).toUpperCase(),
+          }));
+
+        setGroups(formattedGroups);
+
+        console.log(
+          'Formatted Groups:',
+          formattedGroups
+        );
+      } else {
+        setGroups([]);
+      }
     } catch (error) {
       console.log('Fetch Groups Error:', error);
+      setGroups([]);
     }
   };
 
-  // ============================================================
-  // FETCH TASKS
-  // ============================================================
   const fetchTasks = useCallback(async () => {
-  try {
-    setLoading(true);
+    try {
+      setLoading(true);
 
-    const token = await getToken();
+      const token = await getToken();
 
-    if (!token) {
-      return;
-    }
-
-    const isTimeBased = selectedMode === 'time';
-
-    const tabParam =
-      selectedTab === 'ALL'
-        ? ''
-        : selectedTab.toLowerCase();
-
-    const query =
-      `/Task/personal?tab=${encodeURIComponent(tabParam)}` +
-      `&isTimeBased=${isTimeBased}`;
-
-    console.log(
-      'Home Dashboard Fetch:',
-      `${BASE_URL}${query}`
-    );
-
-    const response = await fetch(
-      `${BASE_URL}${query}`,
-      {
-        method: 'GET',
-        headers: {
-          Accept: 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+      if (!token) {
+        return;
       }
-    );
 
-    const data = await response.json();
+      const isTimeBased = selectedMode === 'time';
 
-    console.log(
-      'Home Dashboard Response:',
-      data
-    );
+      const tabParam =
+        selectedTab === 'ALL'
+          ? ''
+          : selectedTab.toLowerCase();
 
-    if (response.status === 401) {
-      Alert.alert(
-        'Session Expired',
-        'Please login again.',
-        [
-          {
-            text: 'OK',
-            onPress: () =>
-              goToLogin(navigation),
+      const query =
+        `/Task/personal?tab=${encodeURIComponent(tabParam)}` +
+        `&isTimeBased=${isTimeBased}`;
+
+      console.log(
+        'Home Dashboard Fetch:',
+        `${BASE_URL}${query}`
+      );
+
+      const response = await fetch(
+        `${BASE_URL}${query}`,
+        {
+          method: 'GET',
+          headers: {
+            Accept: 'application/json',
+            Authorization: `Bearer ${token}`,
           },
-        ]
-      );
-
-      return;
-    }
-
-    if (!response.ok) {
-      throw new Error(
-        data?.message ||
-        `Request failed with status ${response.status}`
-      );
-    }
-
-    if (!data?.success) {
-      throw new Error(
-        data?.message ||
-        'Failed to fetch dashboard tasks.'
-      );
-    }
-
-    // ==========================================================
-    // ONLY USE TASKS RETURNED BY /personal
-    // Backend already filters:
-    // - current user
-    // - personal tasks
-    // - time/non-time mode
-    // - selected tab
-    // - Done tasks
-    // - Cancelled tasks
-    // ==========================================================
-    const fetchedTasks = Array.isArray(data.data)
-      ? data.data
-      : [];
-
-    // Extra frontend safety:
-    // Never display completed/cancelled tasks on Dashboard.
-    const dashboardTasks = fetchedTasks.filter(
-      task =>
-        task &&
-        task.status !== 'Done' &&
-        task.status !== 'Cancelled'
-    );
-
-    setTasks(dashboardTasks);
-
-    console.log(
-      'Dashboard Tasks Count:',
-      dashboardTasks.length
-    );
-
-    // ==========================================================
-    // CLASH DETECTION
-    // ==========================================================
-    if (isTimeBased) {
-      const timeMap = {};
-
-      dashboardTasks.forEach(task => {
-        if (
-          !task.dueDate ||
-          !task.dueTime ||
-          task.status === 'Done' ||
-          task.status === 'Cancelled'
-        ) {
-          return;
         }
+      );
 
-        const key =
-          `${task.dueDate}_${task.dueTime}`;
+      const data = await response.json();
 
-        if (!timeMap[key]) {
-          timeMap[key] = task;
-        } else {
-          const task1 = timeMap[key];
-          const task2 = task;
+      console.log(
+        'Home Dashboard Response:',
+        data
+      );
 
-          Alert.alert(
-            '⚠️ Task Clash Detected!',
-            `"${task1.title}" and "${task2.title}" are scheduled at the same time (${task.dueDate} ${task.dueTime}).`,
-            [
-              {
-                text: 'View Clash',
-                onPress: () =>
-                  navigation.navigate(
-                    'ClashTaskScreen',
-                    {
-                      task1,
-                      task2,
-                    }
-                  ),
-              },
-              {
-                text: 'Dismiss',
-                style: 'cancel',
-              },
-            ]
-          );
-        }
-      });
+      if (response.status === 401) {
+        Alert.alert(
+          'Session Expired',
+          'Please login again.',
+          [
+            {
+              text: 'OK',
+              onPress: () =>
+                goToLogin(navigation),
+            },
+          ]
+        );
+
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          data?.message ||
+            `Request failed with status ${response.status}`
+        );
+      }
+
+      if (!data?.success) {
+        throw new Error(
+          data?.message ||
+            'Failed to fetch dashboard tasks.'
+        );
+      }
+
+      const fetchedTasks = Array.isArray(data.data)
+        ? data.data
+        : [];
+
+      const dashboardTasks = fetchedTasks.filter(
+        task =>
+          task &&
+          task.status !== 'Done' &&
+          task.status !== 'Cancelled'
+      );
+
+      setTasks(dashboardTasks);
+
+      console.log(
+        'Dashboard Tasks Count:',
+        dashboardTasks.length
+      );
+
+      if (isTimeBased) {
+        const timeMap = {};
+
+        dashboardTasks.forEach(task => {
+          if (
+            !task.dueDate ||
+            !task.dueTime ||
+            task.status === 'Done' ||
+            task.status === 'Cancelled'
+          ) {
+            return;
+          }
+
+          const key =
+            `${task.dueDate}_${task.dueTime}`;
+
+          if (!timeMap[key]) {
+            timeMap[key] = task;
+          } else {
+            const task1 = timeMap[key];
+            const task2 = task;
+
+            Alert.alert(
+              '⚠️ Task Clash Detected!',
+              `"${task1.title}" and "${task2.title}" are scheduled at the same time (${task.dueDate} ${task.dueTime}).`,
+              [
+                {
+                  text: 'View Clash',
+                  onPress: () =>
+                    navigation.navigate(
+                      'ClashTaskScreen',
+                      {
+                        task1,
+                        task2,
+                      }
+                    ),
+                },
+                {
+                  text: 'Dismiss',
+                  style: 'cancel',
+                },
+              ]
+            );
+          }
+        });
+      }
+    } catch (error) {
+      console.log(
+        'Home Dashboard Fetch Error:',
+        error
+      );
+
+      Alert.alert(
+        'Error',
+        error?.message ||
+          'Failed to fetch dashboard tasks.'
+      );
+    } finally {
+      setLoading(false);
     }
-  } catch (error) {
-    console.log(
-      'Home Dashboard Fetch Error:',
-      error
-    );
+  }, [
+    selectedMode,
+    selectedTab,
+    navigation,
+  ]);
 
-    Alert.alert(
-      'Error',
-      error?.message ||
-        'Failed to fetch dashboard tasks.'
-    );
-  } finally {
-    setLoading(false);
-  }
-}, [
-  selectedMode,
-  selectedTab,
-  navigation,
-]);
-
-  // ============================================================
-  // SCREEN FOCUS
-  // ============================================================
   useFocusEffect(
-  useCallback(() => {
-    fetchGroups();
-    fetchTasks();
-  }, [fetchTasks])
-);
+    useCallback(() => {
+      fetchGroups();
+      fetchTasks();
+    }, [fetchTasks])
+  );
 
-
-  // ============================================================
-  // REMINDER ALARM POPUP
-  // ============================================================
   useEffect(() => {
     const interval = setInterval(() => {
       tasks.forEach(task => {
@@ -332,18 +307,32 @@ const HomeDashboard = ({ navigation }) => {
           return;
         }
 
-        const taskDateTimeStr = `${task.dueDate}T${task.dueTime}:00`;
-        const taskDate = new Date(taskDateTimeStr);
+        const taskDateTimeStr =
+          `${task.dueDate}T${task.dueTime}:00`;
+
+        const taskDate =
+          new Date(taskDateTimeStr);
+
         const nowTime = new Date();
 
-        const diffMs = taskDate.getTime() - nowTime.getTime();
-        const diffMins = Math.round(diffMs / 60000);
+        const diffMs =
+          taskDate.getTime() -
+          nowTime.getTime();
 
-        if (diffMins === 0 || diffMins === 5) {
-          navigation.navigate('ReminderAlarmScreen', {
-            task,
-            isAdvance: diffMins === 5,
-          });
+        const diffMins =
+          Math.round(diffMs / 60000);
+
+        if (
+          diffMins === 0 ||
+          diffMins === 5
+        ) {
+          navigation.navigate(
+            'ReminderAlarmScreen',
+            {
+              task,
+              isAdvance: diffMins === 5,
+            }
+          );
         }
       });
     }, 60000);
@@ -351,9 +340,6 @@ const HomeDashboard = ({ navigation }) => {
     return () => clearInterval(interval);
   }, [tasks, navigation]);
 
-  // ============================================================
-  // MARK TASK AS DONE
-  // ============================================================
   const handleMarkDone = async task => {
     try {
       const token = await getToken();
@@ -375,7 +361,10 @@ const HomeDashboard = ({ navigation }) => {
 
       const data = await response.json();
 
-      console.log('Mark Done Response:', data);
+      console.log(
+        'Mark Done Response:',
+        data
+      );
 
       if (response.status === 401) {
         Alert.alert(
@@ -384,7 +373,8 @@ const HomeDashboard = ({ navigation }) => {
           [
             {
               text: 'OK',
-              onPress: () => goToLogin(navigation),
+              onPress: () =>
+                goToLogin(navigation),
             },
           ]
         );
@@ -393,7 +383,8 @@ const HomeDashboard = ({ navigation }) => {
 
       if (!response.ok || !data?.success) {
         throw new Error(
-          data?.message || 'Failed to mark task as done'
+          data?.message ||
+            'Failed to mark task as done'
         );
       }
 
@@ -404,18 +395,19 @@ const HomeDashboard = ({ navigation }) => {
 
       fetchTasks();
     } catch (error) {
-      console.log('Mark Done Error:', error);
+      console.log(
+        'Mark Done Error:',
+        error
+      );
 
       Alert.alert(
         'Error',
-        error?.message || 'Failed to mark task as done'
+        error?.message ||
+          'Failed to mark task as done'
       );
     }
   };
 
-  // ============================================================
-  // DELETE TASK
-  // ============================================================
   const handleDeleteTask = async taskId => {
     Alert.alert(
       'Delete Task',
@@ -447,9 +439,13 @@ const HomeDashboard = ({ navigation }) => {
                 }
               );
 
-              const data = await response.json();
+              const data =
+                await response.json();
 
-              console.log('Delete Task Response:', data);
+              console.log(
+                'Delete Task Response:',
+                data
+              );
 
               if (response.status === 401) {
                 Alert.alert(
@@ -458,31 +454,41 @@ const HomeDashboard = ({ navigation }) => {
                   [
                     {
                       text: 'OK',
-                      onPress: () => goToLogin(navigation),
+                      onPress: () =>
+                        goToLogin(navigation),
                     },
                   ]
                 );
                 return;
               }
 
-              if (!response.ok || !data?.success) {
+              if (
+                !response.ok ||
+                !data?.success
+              ) {
                 throw new Error(
-                  data?.message || 'Failed to delete task'
+                  data?.message ||
+                    'Failed to delete task'
                 );
               }
 
               Alert.alert(
                 'Success',
-                data?.message || 'Task deleted successfully'
+                data?.message ||
+                  'Task deleted successfully'
               );
 
               fetchTasks();
             } catch (error) {
-              console.log('Delete Task Error:', error);
+              console.log(
+                'Delete Task Error:',
+                error
+              );
 
               Alert.alert(
                 'Error',
-                error?.message || 'Failed to delete task'
+                error?.message ||
+                  'Failed to delete task'
               );
             }
           },
@@ -491,29 +497,40 @@ const HomeDashboard = ({ navigation }) => {
     );
   };
 
-  // ============================================================
-  // CATEGORY NAVIGATION
-  // ============================================================
-  const handleCategory = cat => {
-    if (cat !== 'SELF') {
-      navigation.navigate('GroupDashboard', {
-        groupName: cat,
-      });
+  const handleCategory = group => {
+    if (!group || !group.name) {
+      return;
     }
+
+    console.log(
+      'Opening GroupDashboard:',
+      group
+    );
+
+    navigation.navigate(
+      'GroupDashboard',
+      {
+        groupId: group.id,
+        groupName: group.name,
+      }
+    );
   };
 
-  // ============================================================
-  // EDIT TASK
-  // ============================================================
   const handleEdit = task => {
     if (selectedMode === 'time') {
-      navigation.navigate('EditTaskTimeBased', {
-        task,
-      });
+      navigation.navigate(
+        'EditTaskTimeBased',
+        {
+          task,
+        }
+      );
     } else {
-      navigation.navigate('EditTaskNonTimeBased', {
-        task,
-      });
+      navigation.navigate(
+        'EditTaskNonTimeBased',
+        {
+          task,
+        }
+      );
     }
   };
 
@@ -521,111 +538,233 @@ const HomeDashboard = ({ navigation }) => {
 
   const dynamicStyles = {
     container: {
-      backgroundColor: theme.bg || '#F4F7FA',
+      backgroundColor:
+        theme.bg || '#F4F7FA',
     },
+
     textPrimary: {
-      color: theme.text || '#1E293B',
+      color:
+        theme.text || '#1E293B',
     },
+
     textSubtle: {
-      color: isDark ? '#94A3B8' : '#64748B',
+      color:
+        isDark
+          ? '#94A3B8'
+          : '#64748B',
     },
+
     headerBox: {
-      backgroundColor: theme.headerBox || (isDark ? '#1E293B' : '#FFFFFF'),
-      borderColor: isDark ? '#334155' : '#E2E8F0',
+      backgroundColor:
+        theme.headerBox ||
+        (isDark
+          ? '#1E293B'
+          : '#FFFFFF'),
+      borderColor:
+        isDark
+          ? '#334155'
+          : '#E2E8F0',
     },
+
     tabContainer: {
-      backgroundColor: theme.filterBg || (isDark ? '#1E293B' : '#E2E8F0'),
+      backgroundColor:
+        theme.filterBg ||
+        (isDark
+          ? '#1E293B'
+          : '#E2E8F0'),
     },
+
     activeTab: {
-      backgroundColor: isDark ? '#38BDF8' : '#0284C7',
+      backgroundColor:
+        isDark
+          ? '#38BDF8'
+          : '#0284C7',
     },
+
     inactiveTab: {
-      backgroundColor: 'transparent',
+      backgroundColor:
+        'transparent',
     },
+
     activeTabText: {
       color: '#FFFFFF',
     },
+
     toggleBox: {
-      backgroundColor: theme.headerBox || (isDark ? '#1E293B' : '#FFFFFF'),
-      borderColor: isDark ? '#334155' : '#E2E8F0',
+      backgroundColor:
+        theme.headerBox ||
+        (isDark
+          ? '#1E293B'
+          : '#FFFFFF'),
+      borderColor:
+        isDark
+          ? '#334155'
+          : '#E2E8F0',
     },
+
     toggleActiveBg: {
-      backgroundColor: isDark ? '#0284C720' : '#E0F2FE',
+      backgroundColor:
+        isDark
+          ? '#0284C720'
+          : '#E0F2FE',
     },
+
     card: {
-      backgroundColor: theme.card || (isDark ? '#1E293B' : '#FFFFFF'),
-      borderColor: isDark ? '#334155' : '#E2E8F0',
+      backgroundColor:
+        theme.card ||
+        (isDark
+          ? '#1E293B'
+          : '#FFFFFF'),
+      borderColor:
+        isDark
+          ? '#334155'
+          : '#E2E8F0',
     },
+
     completedCard: {
-      backgroundColor: isDark ? '#0F172A' : '#F8FAFC',
-      borderColor: isDark ? '#1E293B' : '#CBD5E1',
+      backgroundColor:
+        isDark
+          ? '#0F172A'
+          : '#F8FAFC',
+      borderColor:
+        isDark
+          ? '#1E293B'
+          : '#CBD5E1',
     },
+
     clockBg: {
-      backgroundColor: isDark ? '#0F172A' : '#F1F5F9',
-      borderColor: isDark ? '#38BDF8' : '#0284C7',
+      backgroundColor:
+        isDark
+          ? '#0F172A'
+          : '#F1F5F9',
+      borderColor:
+        isDark
+          ? '#38BDF8'
+          : '#0284C7',
     },
+
     categoryChip: {
-      backgroundColor: theme.card || (isDark ? '#1E293B' : '#FFFFFF'),
-      borderColor: isDark ? '#334155' : '#CBD5E1',
+      backgroundColor:
+        theme.card ||
+        (isDark
+          ? '#1E293B'
+          : '#FFFFFF'),
+      borderColor:
+        isDark
+          ? '#334155'
+          : '#CBD5E1',
     },
+
     activeCategoryChip: {
-      backgroundColor: isDark ? '#38BDF8' : '#0284C7',
-      borderColor: isDark ? '#38BDF8' : '#0284C7',
+      backgroundColor:
+        isDark
+          ? '#38BDF8'
+          : '#0284C7',
+      borderColor:
+        isDark
+          ? '#38BDF8'
+          : '#0284C7',
     },
+
     bottomNav: {
-      backgroundColor: theme.bottomNav || (isDark ? '#0F172A' : '#0F172A'),
+      backgroundColor:
+        theme.bottomNav ||
+        '#0F172A',
     },
   };
 
   return (
-    <SafeAreaView style={[styles.container, dynamicStyles.container]}>
+    <SafeAreaView
+      style={[
+        styles.container,
+        dynamicStyles.container,
+      ]}
+    >
       <StatusBar
-        barStyle={isDark ? 'light-content' : 'dark-content'}
-        backgroundColor={theme.bg || (isDark ? '#0F172A' : '#F4F7FA')}
+        barStyle={
+          isDark
+            ? 'light-content'
+            : 'dark-content'
+        }
+        backgroundColor={
+          theme.bg ||
+          (isDark
+            ? '#0F172A'
+            : '#F4F7FA')
+        }
         translucent={false}
       />
 
-      {/* HEADER */}
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.iconTouchArea}
-          onPress={() => navigation.goBack()}
+          onPress={() =>
+            navigation.goBack()
+          }
           activeOpacity={0.7}
         >
           <Icon
             name="chevron-back"
             size={24}
-            color={dynamicStyles.textPrimary.color}
+            color={
+              dynamicStyles.textPrimary
+                .color
+            }
           />
         </TouchableOpacity>
 
-        <View style={[styles.headerBox, dynamicStyles.headerBox]}>
-          <Text style={[styles.headerTitle, dynamicStyles.textPrimary]}>
+        <View
+          style={[
+            styles.headerBox,
+            dynamicStyles.headerBox,
+          ]}
+        >
+          <Text
+            style={[
+              styles.headerTitle,
+              dynamicStyles.textPrimary,
+            ]}
+          >
             TO-DO LIST
           </Text>
         </View>
 
         <TouchableOpacity
           style={styles.iconTouchArea}
-          onPress={() => navigation.navigate('NotificationScreen')}
+          onPress={() =>
+            navigation.navigate(
+              'NotificationScreen'
+            )
+          }
           activeOpacity={0.7}
         >
           <Icon
             name="notifications-outline"
             size={22}
-            color={dynamicStyles.textPrimary.color}
+            color={
+              dynamicStyles.textPrimary
+                .color
+            }
           />
         </TouchableOpacity>
       </View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={
+          styles.scrollContent
+        }
       >
-        {/* TABS */}
-        <View style={[styles.tabContainer, dynamicStyles.tabContainer]}>
+        <View
+          style={[
+            styles.tabContainer,
+            dynamicStyles.tabContainer,
+          ]}
+        >
           {tabs.map(tab => {
-            const isActive = selectedTab === tab;
+            const isActive =
+              selectedTab === tab;
+
             return (
               <TouchableOpacity
                 key={tab}
@@ -635,7 +774,9 @@ const HomeDashboard = ({ navigation }) => {
                     ? dynamicStyles.activeTab
                     : dynamicStyles.inactiveTab,
                 ]}
-                onPress={() => setSelectedTab(tab)}
+                onPress={() =>
+                  setSelectedTab(tab)
+                }
                 activeOpacity={0.8}
               >
                 <Text
@@ -653,81 +794,161 @@ const HomeDashboard = ({ navigation }) => {
           })}
         </View>
 
-        {/* TYPE SWITCHER */}
-        <View style={[styles.toggleBox, dynamicStyles.toggleBox]}>
+        <View
+          style={[
+            styles.toggleBox,
+            dynamicStyles.toggleBox,
+          ]}
+        >
           <TouchableOpacity
-            onPress={() => setSelectedMode('time')}
+            onPress={() =>
+              setSelectedMode('time')
+            }
             style={[
               styles.toggleItem,
-              selectedMode === 'time' && dynamicStyles.toggleActiveBg,
+              selectedMode === 'time' &&
+                dynamicStyles.toggleActiveBg,
             ]}
             activeOpacity={0.8}
           >
             <View
               style={[
                 styles.radioOuter,
-                selectedMode === 'time' && styles.radioOuterActive,
+                selectedMode === 'time' &&
+                  styles.radioOuterActive,
               ]}
             >
-              {selectedMode === 'time' && <View style={styles.radioInner} />}
+              {selectedMode === 'time' && (
+                <View
+                  style={styles.radioInner}
+                />
+              )}
             </View>
-            <Text style={[styles.toggleText, dynamicStyles.textPrimary]}>
+
+            <Text
+              style={[
+                styles.toggleText,
+                dynamicStyles.textPrimary,
+              ]}
+            >
               Time Based
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            onPress={() => setSelectedMode('non')}
+            onPress={() =>
+              setSelectedMode('non')
+            }
             style={[
               styles.toggleItem,
-              selectedMode === 'non' && dynamicStyles.toggleActiveBg,
+              selectedMode === 'non' &&
+                dynamicStyles.toggleActiveBg,
             ]}
             activeOpacity={0.8}
           >
             <View
               style={[
                 styles.radioOuter,
-                selectedMode === 'non' && styles.radioOuterActive,
+                selectedMode === 'non' &&
+                  styles.radioOuterActive,
               ]}
             >
-              {selectedMode === 'non' && <View style={styles.radioInner} />}
+              {selectedMode === 'non' && (
+                <View
+                  style={styles.radioInner}
+                />
+              )}
             </View>
-            <Text style={[styles.toggleText, dynamicStyles.textPrimary]}>
+
+            <Text
+              style={[
+                styles.toggleText,
+                dynamicStyles.textPrimary,
+              ]}
+            >
               Non Time Based
             </Text>
           </TouchableOpacity>
         </View>
 
-        {/* SECTION TITLE */}
         <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, dynamicStyles.textPrimary]}>
+          <Text
+            style={[
+              styles.sectionTitle,
+              dynamicStyles.textPrimary,
+            ]}
+          >
             SELF
           </Text>
-          <Text style={[styles.taskCountBadge, dynamicStyles.textSubtle]}>
-            {filteredTasks.length} {filteredTasks.length === 1 ? 'task' : 'tasks'}
+
+          <Text
+            style={[
+              styles.taskCountBadge,
+              dynamicStyles.textSubtle,
+            ]}
+          >
+            {filteredTasks.length}{' '}
+            {filteredTasks.length === 1
+              ? 'task'
+              : 'tasks'}
           </Text>
         </View>
 
-        {/* TASK LIST */}
         {loading ? (
-          <View style={styles.stateContainer}>
-            <ActivityIndicator size="large" color={isDark ? '#38BDF8' : '#0284C7'} />
-            <Text style={[styles.stateText, dynamicStyles.textSubtle]}>
+          <View
+            style={styles.stateContainer}
+          >
+            <ActivityIndicator
+              size="large"
+              color={
+                isDark
+                  ? '#38BDF8'
+                  : '#0284C7'
+              }
+            />
+
+            <Text
+              style={[
+                styles.stateText,
+                dynamicStyles.textSubtle,
+              ]}
+            >
               Loading tasks...
             </Text>
           </View>
         ) : filteredTasks.length === 0 ? (
-          <View style={styles.emptyStateContainer}>
+          <View
+            style={
+              styles.emptyStateContainer
+            }
+          >
             <Icon
               name="checkmark-done-circle-outline"
               size={56}
-              color={isDark ? '#475569' : '#CBD5E1'}
+              color={
+                isDark
+                  ? '#475569'
+                  : '#CBD5E1'
+              }
             />
-            <Text style={[styles.emptyStateTitle, dynamicStyles.textPrimary]}>
+
+            <Text
+              style={[
+                styles.emptyStateTitle,
+                dynamicStyles.textPrimary,
+              ]}
+            >
               No tasks found
             </Text>
-            <Text style={[styles.emptyStateSub, dynamicStyles.textSubtle]}>
-              You have no pending items in this view.
+
+            <Text
+              style={[
+                styles.emptyStateSub,
+                dynamicStyles.textSubtle,
+              ]}
+            >
+              You have no pending items in
+              this view.
             </Text>
           </View>
         ) : (
@@ -737,64 +958,121 @@ const HomeDashboard = ({ navigation }) => {
               style={[
                 styles.card,
                 dynamicStyles.card,
-                task.isCompleted && dynamicStyles.completedCard,
+                task.isCompleted &&
+                  dynamicStyles.completedCard,
               ]}
               activeOpacity={0.85}
               onPress={() =>
-                navigation.navigate('TaskOverviewScreen', {
-                  task,
-                })
+                navigation.navigate(
+                  'TaskOverviewScreen',
+                  {
+                    task,
+                  }
+                )
               }
             >
-              <View style={styles.cardLeft}>
-                <View style={[styles.clock, dynamicStyles.clockBg]}>
+              <View
+                style={styles.cardLeft}
+              >
+                <View
+                  style={[
+                    styles.clock,
+                    dynamicStyles.clockBg,
+                  ]}
+                >
                   <Icon
-                    name={selectedMode === 'time' ? 'time-outline' : 'list-outline'}
+                    name={
+                      selectedMode === 'time'
+                        ? 'time-outline'
+                        : 'list-outline'
+                    }
                     size={18}
-                    color={isDark ? '#38BDF8' : '#0284C7'}
+                    color={
+                      isDark
+                        ? '#38BDF8'
+                        : '#0284C7'
+                    }
                   />
                 </View>
 
-                <View style={styles.taskTextContainer}>
+                <View
+                  style={
+                    styles.taskTextContainer
+                  }
+                >
                   <Text
                     style={[
                       styles.taskTitle,
                       dynamicStyles.textPrimary,
-                      task.isCompleted && styles.completedText,
+                      task.isCompleted &&
+                        styles.completedText,
                     ]}
                     numberOfLines={2}
                   >
                     {task.title}
                   </Text>
 
-                  <Text style={[styles.taskDate, dynamicStyles.textSubtle]}>
+                  <Text
+                    style={[
+                      styles.taskDate,
+                      dynamicStyles.textSubtle,
+                    ]}
+                  >
                     {task.dueDate
-                      ? `${task.dueDate} ${task.dueTime || ''}`.trim()
+                      ? `${task.dueDate} ${
+                          task.dueTime || ''
+                        }`.trim()
                       : 'No Due Date'}
                   </Text>
 
                   {task.isCompleted && (
-                    <View style={styles.completedBadgeRow}>
-                      <Icon name="checkmark-circle" size={12} color="#10B981" />
-                      <Text style={styles.completedBadge}>Completed</Text>
+                    <View
+                      style={
+                        styles.completedBadgeRow
+                      }
+                    >
+                      <Icon
+                        name="checkmark-circle"
+                        size={12}
+                        color="#10B981"
+                      />
+
+                      <Text
+                        style={
+                          styles.completedBadge
+                        }
+                      >
+                        Completed
+                      </Text>
                     </View>
                   )}
                 </View>
               </View>
 
-              <View style={styles.cardActions}>
+              <View
+                style={styles.cardActions}
+              >
                 <TouchableOpacity
                   style={styles.actionBtn}
                   onPress={e => {
                     e.stopPropagation?.();
                     handleEdit(task);
                   }}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  hitSlop={{
+                    top: 8,
+                    bottom: 8,
+                    left: 8,
+                    right: 8,
+                  }}
                 >
                   <Icon
                     name="create-outline"
                     size={18}
-                    color={isDark ? '#94A3B8' : '#64748B'}
+                    color={
+                      isDark
+                        ? '#94A3B8'
+                        : '#64748B'
+                    }
                   />
                 </TouchableOpacity>
 
@@ -802,28 +1080,52 @@ const HomeDashboard = ({ navigation }) => {
                   style={styles.actionBtn}
                   onPress={e => {
                     e.stopPropagation?.();
-                    handleDeleteTask(task.id);
+                    handleDeleteTask(
+                      task.id
+                    );
                   }}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  hitSlop={{
+                    top: 8,
+                    bottom: 8,
+                    left: 8,
+                    right: 8,
+                  }}
                 >
-                  <Icon name="trash-outline" size={18} color="#EF4444" />
+                  <Icon
+                    name="trash-outline"
+                    size={18}
+                    color="#EF4444"
+                  />
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   style={[
                     styles.checkbox,
-                    task.isCompleted && styles.checkboxDone,
+                    task.isCompleted &&
+                      styles.checkboxDone,
                   ]}
                   onPress={e => {
                     e.stopPropagation?.();
-                    if (!task.isCompleted) {
+
+                    if (
+                      !task.isCompleted
+                    ) {
                       handleMarkDone(task);
                     }
                   }}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  hitSlop={{
+                    top: 8,
+                    bottom: 8,
+                    left: 8,
+                    right: 8,
+                  }}
                 >
                   {task.isCompleted && (
-                    <Icon name="checkmark" size={14} color="#FFFFFF" />
+                    <Icon
+                      name="checkmark"
+                      size={14}
+                      color="#FFFFFF"
+                    />
                   )}
                 </TouchableOpacity>
               </View>
@@ -832,104 +1134,207 @@ const HomeDashboard = ({ navigation }) => {
         )}
       </ScrollView>
 
-      {/* FAB */}
       <TouchableOpacity
         style={styles.fab}
         activeOpacity={0.9}
-        onPress={() => navigation.navigate('AddTaskTimeBased')}
+        onPress={() =>
+          navigation.navigate(
+            'AddTaskTimeBased'
+          )
+        }
       >
-        <Icon name="add" size={28} color="#FFFFFF" />
+        <Icon
+          name="add"
+          size={28}
+          color="#FFFFFF"
+        />
       </TouchableOpacity>
 
-      {/* CATEGORY SELECTOR */}
-      <View style={styles.categoryContainer}>
+      <View
+        style={styles.categoryContainer}
+      >
         <ScrollView
           horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoryScrollContent}
+          showsHorizontalScrollIndicator={
+            false
+          }
+          contentContainerStyle={
+            styles.categoryScrollContent
+          }
         >
-          {categories.map(cat => {
-            const isSelf = cat === 'SELF';
-            return (
-              <TouchableOpacity
-                key={cat}
+          <TouchableOpacity
+            key="SELF"
+            style={[
+              styles.categoryChip,
+              dynamicStyles.categoryChip,
+              dynamicStyles.activeCategoryChip,
+            ]}
+            onPress={() => {
+              console.log(
+                'SELF category selected'
+              );
+            }}
+            activeOpacity={0.8}
+          >
+            <Text
+              style={[
+                styles.categoryText,
+                dynamicStyles.activeTabText,
+              ]}
+            >
+              SELF
+            </Text>
+          </TouchableOpacity>
+
+          {groups.map(group => (
+            <TouchableOpacity
+              key={
+                group.id !== null
+                  ? `group-${group.id}`
+                  : `group-${group.name}`
+              }
+              style={[
+                styles.categoryChip,
+                dynamicStyles.categoryChip,
+              ]}
+              onPress={() =>
+                handleCategory(group)
+              }
+              activeOpacity={0.8}
+            >
+              <Text
                 style={[
-                  styles.categoryChip,
-                  dynamicStyles.categoryChip,
-                  isSelf && dynamicStyles.activeCategoryChip,
+                  styles.categoryText,
+                  dynamicStyles.textPrimary,
                 ]}
-                onPress={() => handleCategory(cat)}
-                activeOpacity={0.8}
               >
-                <Text
-                  style={[
-                    styles.categoryText,
-                    isSelf
-                      ? dynamicStyles.activeTabText
-                      : dynamicStyles.textPrimary,
-                  ]}
-                >
-                  {cat}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
+                {group.name}
+              </Text>
+            </TouchableOpacity>
+          ))}
 
           <TouchableOpacity
             style={styles.smallAddBtn}
-            onPress={() => navigation.navigate('CreateGroup')}
+            onPress={() =>
+              navigation.navigate(
+                'CreateGroup'
+              )
+            }
             activeOpacity={0.8}
           >
-            <Icon name="add" size={18} color="#FFFFFF" />
+            <Icon
+              name="add"
+              size={18}
+              color="#FFFFFF"
+            />
           </TouchableOpacity>
         </ScrollView>
       </View>
 
-      {/* BOTTOM NAVIGATION */}
-      <View style={[styles.bottomNav, dynamicStyles.bottomNav]}>
+      <View
+        style={[
+          styles.bottomNav,
+          dynamicStyles.bottomNav,
+        ]}
+      >
         <TouchableOpacity
           style={styles.iconNavBtn}
-          onPress={() => navigation.navigate('HomeDashboard')}
+          onPress={() =>
+            navigation.navigate(
+              'HomeDashboard'
+            )
+          }
           activeOpacity={0.7}
         >
-          <Icon name="home" size={22} color="#38BDF8" />
-          <Text style={[styles.navLabel, styles.activeNavLabel]}>Home</Text>
+          <Icon
+            name="home"
+            size={22}
+            color="#38BDF8"
+          />
+          <Text
+            style={[
+              styles.navLabel,
+              styles.activeNavLabel,
+            ]}
+          >
+            Home
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.iconNavBtn}
-          onPress={() => navigation.navigate('ContactScreen')}
+          onPress={() =>
+            navigation.navigate(
+              'ContactScreen'
+            )
+          }
           activeOpacity={0.7}
         >
-          <Icon name="people-outline" size={22} color="#94A3B8" />
-          <Text style={styles.navLabel}>Contacts</Text>
+          <Icon
+            name="people-outline"
+            size={22}
+            color="#94A3B8"
+          />
+          <Text style={styles.navLabel}>
+            Contacts
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.iconNavBtn}
-          onPress={() => navigation.navigate('ClashTaskScreen')}
+          onPress={() =>
+            navigation.navigate(
+              'ClashTaskScreen'
+            )
+          }
           activeOpacity={0.7}
         >
-          <Icon name="warning-outline" size={22} color="#94A3B8" />
-          <Text style={styles.navLabel}>Clashes</Text>
+          <Icon
+            name="warning-outline"
+            size={22}
+            color="#94A3B8"
+          />
+          <Text style={styles.navLabel}>
+            Clashes
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.iconNavBtn}
-          onPress={() => navigation.navigate('TimeBasedHistoryScreen')}
+          onPress={() =>
+            navigation.navigate(
+              'TimeBasedHistoryScreen'
+            )
+          }
           activeOpacity={0.7}
         >
-          <Icon name="time-outline" size={22} color="#94A3B8" />
-          <Text style={styles.navLabel}>History</Text>
+          <Icon
+            name="time-outline"
+            size={22}
+            color="#94A3B8"
+          />
+          <Text style={styles.navLabel}>
+            History
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.iconNavBtn}
-          onPress={() => navigation.navigate('SettingScreen')}
+          onPress={() =>
+            navigation.navigate(
+              'SettingScreen'
+            )
+          }
           activeOpacity={0.7}
         >
-          <Icon name="settings-outline" size={22} color="#94A3B8" />
-          <Text style={styles.navLabel}>Settings</Text>
+          <Icon
+            name="settings-outline"
+            size={22}
+            color="#94A3B8"
+          />
+          <Text style={styles.navLabel}>
+            Settings
+          </Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -945,10 +1350,11 @@ const styles = StyleSheet.create({
 
   header: {
     flexDirection: 'row',
-    justify: 'space-between',
+    justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'android' ? 10 : 0,
+    paddingTop:
+      Platform.OS === 'android' ? 10 : 0,
     paddingBottom: 10,
   },
 
@@ -967,7 +1373,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     elevation: 1,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
     shadowOpacity: 0.05,
     shadowRadius: 2,
   },
@@ -1104,7 +1513,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     elevation: 2,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
     shadowOpacity: 0.04,
     shadowRadius: 4,
   },
@@ -1197,7 +1609,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     elevation: 6,
     shadowColor: '#0284C7',
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
     shadowOpacity: 0.35,
     shadowRadius: 6,
     zIndex: 10,
@@ -1209,7 +1624,8 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     paddingVertical: 8,
-    zIndex: 5,
+    zIndex: 20,
+    elevation: 20,
   },
 
   categoryScrollContent: {
@@ -1250,7 +1666,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 8,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.08)',
+    borderTopColor:
+      'rgba(255,255,255,0.08)',
+    zIndex: 10,
+    elevation: 10,
   },
 
   iconNavBtn: {
