@@ -517,6 +517,25 @@ const HomeDashboard = ({ navigation }) => {
   };
 
   const handleEdit = task => {
+    // Location based tasks have no date or time - they open their own editor.
+    const isLocationBased =
+      task?.latitude !== null &&
+      task?.latitude !== undefined &&
+      task?.longitude !== null &&
+      task?.longitude !== undefined &&
+      task?.geofenceEnabled !== false;
+
+    if (isLocationBased) {
+      navigation.navigate(
+        'EditTaskLocationBased',
+        {
+          task,
+        }
+      );
+
+      return;
+    }
+
     if (selectedMode === 'time') {
       navigation.navigate(
         'EditTaskTimeBased',

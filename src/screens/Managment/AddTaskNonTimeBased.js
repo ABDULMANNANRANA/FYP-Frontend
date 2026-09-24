@@ -275,6 +275,18 @@ const AddTaskNonTimeBased = ({ navigation, route }) => {
     navigation.navigate("AddTaskTimeBased", params);
   };
 
+  const handleLocationBasedNavigation = () => {
+    setTaskType("location");
+
+    const params = {};
+
+    if (isGroupTask) {
+      params.groupId = Number(groupIdParam);
+    }
+
+    navigation.navigate("AddTaskLocationBased", params);
+  };
+
   const isMemberSelected = (member) => {
     if (!member?.userId) {
       return false;
@@ -1024,6 +1036,68 @@ const AddTaskNonTimeBased = ({ navigation, route }) => {
                   ]}
                 >
                   Non-Time Based
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={
+                  handleLocationBasedNavigation
+                }
+                style={[
+                  styles.radioItem,
+                  {
+                    backgroundColor:
+                      inputBg,
+                    borderColor:
+                      taskType ===
+                      "location"
+                        ? primaryColor
+                        : borderClr,
+                  },
+                ]}
+                activeOpacity={0.7}
+                disabled={loading}
+              >
+                <View
+                  style={[
+                    styles.radioOuter,
+                    {
+                      borderColor:
+                        taskType ===
+                        "location"
+                          ? primaryColor
+                          : subTextColor,
+                    },
+                  ]}
+                >
+                  {taskType ===
+                    "location" && (
+                    <View
+                      style={[
+                        styles.radioInner,
+                        {
+                          backgroundColor:
+                            primaryColor,
+                        },
+                      ]}
+                    />
+                  )}
+                </View>
+
+                <Text
+                  style={[
+                    styles.radioText,
+                    {
+                      color:
+                        textColor,
+                      fontWeight:
+                        taskType ===
+                        "location"
+                          ? "700"
+                          : "500",
+                    },
+                  ]}
+                >
+                  Location Based
                 </Text>
               </TouchableOpacity>
             </View>
@@ -8435,4 +8509,3 @@ const styles = StyleSheet.create({
 // // // //     alignItems: "center",
 // // // //   },
 // // // // });
-

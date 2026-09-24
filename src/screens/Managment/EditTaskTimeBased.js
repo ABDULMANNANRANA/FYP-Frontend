@@ -295,6 +295,16 @@ const EditTaskTimeBased = ({ navigation, route }) => {
     });
   };
 
+  const switchToLocationBased = () => {
+    navigation.navigate('EditTaskLocationBased', {
+      task: {
+        ...task,
+        title,
+        description,
+      },
+    });
+  };
+
   // Dynamic Theme Colors with precise fallback handling
   const isDarkTheme = isDark || theme?.mode === 'dark';
   const cardBg = theme.card || (isDarkTheme ? '#1E293B' : '#FFFFFF');
@@ -491,6 +501,29 @@ const EditTaskTimeBased = ({ navigation, route }) => {
             </View>
 
             <Icon name="calendar-outline" size={18} color={subTextColor} />
+          </TouchableOpacity>
+
+          {/* LOCATION BASED OPTION */}
+          <TouchableOpacity
+            style={[styles.radioItem, { borderColor: inputBorder }]}
+            onPress={switchToLocationBased}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.radioOuter, { borderColor: subTextColor }]}>
+              {/* Unchecked */}
+            </View>
+
+            <View style={styles.radioTextWrapper}>
+              <Text style={[styles.radioLabelText, { color: textColor }]}>
+                Location Based
+              </Text>
+
+              <Text style={[styles.radioSubLabelText, { color: subTextColor }]}>
+                Remind me when I arrive at a place
+              </Text>
+            </View>
+
+            <Icon name="location-outline" size={18} color={subTextColor} />
           </TouchableOpacity>
         </View>
 

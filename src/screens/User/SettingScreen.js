@@ -15,6 +15,7 @@ import {
 import Ionicons from '@react-native-vector-icons/ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../../context/ThemeContext';
+import LiveLocationCard from '../../components/LiveLocationCard';
 
 const { width } = Dimensions.get('window');
 
@@ -259,6 +260,9 @@ const SettingScreen = ({ navigation }) => {
             />
           </View>
         </View>
+
+        {/* ================= LIVE LOCATION ================= */}
+        <LiveLocationCard />
 
         {/* ================= ACCOUNT ACTIONS ================= */}
         <View style={styles.logoutWrapper}>
@@ -1147,4 +1151,3 @@ const styles = StyleSheet.create({
 //     height: '100%',
 //   },
 // });
-
