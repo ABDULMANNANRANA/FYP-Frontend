@@ -31,6 +31,23 @@ const goToLogin = navigation => {
   });
 };
 
+// ============================================================
+// LOCATION BASED TASK CHECK
+//
+// A Location Based task is a non-time task that has a saved
+// place (latitude + longitude) and its geofence is not turned
+// off. Used by the "Location Based" toggle and the edit routing.
+// ============================================================
+const isLocationBasedTask = task => {
+  return (
+    task?.latitude !== null &&
+    task?.latitude !== undefined &&
+    task?.longitude !== null &&
+    task?.longitude !== undefined &&
+    task?.geofenceEnabled !== false
+  );
+};
+
 const HomeDashboard = ({ navigation }) => {
   const { isDark, theme } = useTheme();
 
@@ -266,17 +283,32 @@ const HomeDashboard = ({ navigation }) => {
           task.status !== 'Cancelled'
       );
 
-      setTasks(dashboardTasks);
+      // ======================================================
+      // LOCATION BASED MODE
+      //
+      // Show ONLY tasks that have a saved place. The API call
+      // already asked for non-time tasks (isTimeBased=false);
+      // a Location Based task is a non-time task with a saved
+      // latitude + longitude.
+      // ======================================================
+      const visibleTasks =
+        selectedMode === 'location'
+          ? dashboardTasks.filter(task =>
+              isLocationBasedTask(task),
+            )
+          : dashboardTasks;
+
+      setTasks(visibleTasks);
 
       console.log(
         'Dashboard Tasks Count:',
-        dashboardTasks.length
+        visibleTasks.length
       );
 
       if (isTimeBased) {
         const timeMap = {};
 
-        dashboardTasks.forEach(task => {
+        visibleTasks.forEach(task => {
           if (
             !task.dueDate ||
             !task.dueTime ||
@@ -570,12 +602,7 @@ const HomeDashboard = ({ navigation }) => {
 
   const handleEdit = task => {
     // Location based tasks have no date or time - they open their own editor.
-    const isLocationBased =
-      task?.latitude !== null &&
-      task?.latitude !== undefined &&
-      task?.longitude !== null &&
-      task?.longitude !== undefined &&
-      task?.geofenceEnabled !== false;
+    const isLocationBased = isLocationBasedTask(task);
 
     if (isLocationBased) {
       navigation.navigate(
@@ -952,6 +979,41 @@ const HomeDashboard = ({ navigation }) => {
               Non Time Based
             </Text>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() =>
+              setSelectedMode('location')
+            }
+            style={[
+              styles.toggleItem,
+              selectedMode === 'location' &&
+                dynamicStyles.toggleActiveBg,
+            ]}
+            activeOpacity={0.8}
+          >
+            <View
+              style={[
+                styles.radioOuter,
+                selectedMode === 'location' &&
+                  styles.radioOuterActive,
+              ]}
+            >
+              {selectedMode === 'location' && (
+                <View
+                  style={styles.radioInner}
+                />
+              )}
+            </View>
+
+            <Text
+              style={[
+                styles.toggleText,
+                dynamicStyles.textPrimary,
+              ]}
+            >
+              Location Based
+            </Text>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.sectionHeader}>
@@ -1067,6 +1129,8 @@ const HomeDashboard = ({ navigation }) => {
                     name={
                       selectedMode === 'time'
                         ? 'time-outline'
+                        : selectedMode === 'location'
+                        ? 'location-outline'
                         : 'list-outline'
                     }
                     size={18}
@@ -1105,6 +1169,8 @@ const HomeDashboard = ({ navigation }) => {
                       ? `${task.dueDate} ${
                           task.dueTime || ''
                         }`.trim()
+                      : isLocationBasedTask(task)
+                      ? 'Location Based'
                       : 'No Due Date'}
                   </Text>
 
@@ -1220,11 +1286,21 @@ const HomeDashboard = ({ navigation }) => {
       <TouchableOpacity
         style={styles.fab}
         activeOpacity={0.9}
-        onPress={() =>
-          navigation.navigate(
-            'AddTaskTimeBased'
-          )
-        }
+        onPress={() => {
+          if (selectedMode === 'location') {
+            navigation.navigate(
+              'AddTaskLocationBased'
+            );
+          } else if (selectedMode === 'non') {
+            navigation.navigate(
+              'AddTaskNonTimeBased'
+            );
+          } else {
+            navigation.navigate(
+              'AddTaskTimeBased'
+            );
+          }
+        }}
       >
         <Icon
           name="add"
@@ -1386,7 +1462,7 @@ const HomeDashboard = ({ navigation }) => {
           style={styles.iconNavBtn}
           onPress={() =>
             navigation.navigate(
-              'TimeBasedHistoryScreen'
+              'HistoryScreen'
             )
           }
           activeOpacity={0.7}
@@ -1559,7 +1635,7 @@ const styles = StyleSheet.create({
   },
 
   toggleText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
   },
 
@@ -1796,7 +1872,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 });
-
 
 
 

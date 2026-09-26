@@ -15,6 +15,7 @@ import {
 import Ionicons from '@react-native-vector-icons/ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../../context/ThemeContext';
+import { navigationRef } from '../../navigation/navigationRef';
 import LiveLocationCard from '../../components/LiveLocationCard';
 
 const { width } = Dimensions.get('window');
@@ -26,23 +27,6 @@ const SettingScreen = ({ navigation }) => {
   const [showDropdown, setShowDropdown] = useState(false);
   const [snooze, setSnooze] = useState('5 min');
 
-  // LOGOUT
-  const handleLogout = async () => {
-    try {
-      await AsyncStorage.multiRemove([
-        'token',
-        'userId',
-        'userName',
-      ]);
-
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'AuthStack' }],
-      });
-    } catch (error) {
-      console.log('Logout error:', error);
-    }
-  };
 
   // Safe color fallbacks for theme compatibility
   const textColor = theme.text || (isDark ? '#F9FAFB' : '#111827');
@@ -104,7 +88,7 @@ const SettingScreen = ({ navigation }) => {
           {/* HISTORY */}
           <TouchableOpacity
             style={styles.rowItem}
-            onPress={() => navigation.navigate('TimeBasedHistoryScreen')}
+            onPress={() => navigation.navigate('HistoryScreen')}
             activeOpacity={0.7}
           >
             <View style={styles.left}>
@@ -268,7 +252,7 @@ const SettingScreen = ({ navigation }) => {
         <View style={styles.logoutWrapper}>
           <TouchableOpacity
             style={[styles.logoutBtn, { backgroundColor: isDark ? '#DC2626' : '#EF4444' }]}
-            onPress={handleLogout}
+            onPress={() => navigation.navigate("AuthStack")}
             activeOpacity={0.85}
           >
             <Ionicons
@@ -321,7 +305,7 @@ const SettingScreen = ({ navigation }) => {
         {/* HISTORY */}
         <TouchableOpacity
           style={styles.iconBtn}
-          onPress={() => navigation.navigate('TimeBasedHistoryScreen')}
+          onPress={() => navigation.navigate('HistoryScreen')}
           activeOpacity={0.7}
         >
           <Ionicons
@@ -371,7 +355,7 @@ const styles = StyleSheet.create({
 
   header: {
     flexDirection: 'row',
-    justify: 'space-between',
+    justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingTop: Platform.OS === 'android' ? 12 : 8,
@@ -383,7 +367,7 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     alignItems: 'center',
-    justify: 'center',
+    justifyContent: 'center',
   },
 
   headerRightSpace: {
@@ -466,7 +450,7 @@ const styles = StyleSheet.create({
     height: 36,
     borderRadius: 10,
     alignItems: 'center',
-    justify: 'center',
+    justifyContent: 'center',
     marginRight: 12,
   },
 
@@ -503,7 +487,7 @@ const styles = StyleSheet.create({
   dropItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    justify: 'space-between',
+    justifyContent: 'space-between',
     paddingVertical: 12,
     paddingHorizontal: 16,
   },
@@ -523,7 +507,7 @@ const styles = StyleSheet.create({
   logoutBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    justify: 'center',
+    justifyContent: 'center',
     width: '100%',
     height: 52,
     borderRadius: 14,
@@ -557,7 +541,7 @@ const styles = StyleSheet.create({
     right: 0,
     height: 64,
     flexDirection: 'row',
-    justify: 'space-around',
+    justifyContent: 'space-around',
     alignItems: 'center',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
@@ -578,19 +562,18 @@ const styles = StyleSheet.create({
   iconBtn: {
     flex: 1,
     alignItems: 'center',
-    justify: 'center',
+    justifyContent: 'center',
     height: '100%',
   },
 
   activeTabIndicator: {
     alignItems: 'center',
-    justify: 'center',
+    justifyContent: 'center',
     padding: 6,
     borderRadius: 12,
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
   },
 });
-
 
 
 
