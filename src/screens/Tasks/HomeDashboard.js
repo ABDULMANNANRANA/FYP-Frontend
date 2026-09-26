@@ -1403,7 +1403,7 @@ const HomeDashboard = ({ navigation }) => {
           style={styles.iconNavBtn}
           onPress={() =>
             navigation.navigate(
-              'TimeBasedHistoryScreen'
+              'HistoryScreen'
             )
           }
           activeOpacity={0.7}

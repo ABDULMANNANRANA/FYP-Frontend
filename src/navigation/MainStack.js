@@ -16,6 +16,7 @@ import LocationPickerScreen from '../screens/Managment/LocationPickerScreen';
 import TaskOverviewScreen from '../screens/Tasks/TaskOverviewScreen';
 import ClashTaskScreen from '../screens/Tasks/ClashTaskScreen';
 
+
 // GROUP
 import AddMember from '../screens/Managment/AddMember';
 import CreateGroup from '../screens/Managment/CreateGroup';
@@ -27,8 +28,7 @@ import ForwardTaskTo from '../screens/Managment/ForwardTaskTo';
 import ContactScreen from '../screens/User/ContactScreen';
 
 // HISTORY
-import TimeBasedHistoryScreen from '../screens/User/TimeBasedHistoryScreen';
-import NonTimeBasedHistoryScreen from '../screens/Tasks/NonTimeBasedHistoryScreen';
+import HistoryScreen from '../screens/Tasks/HistoryScreen';
 
 // REMINDER
 import ReminderAlarmScreen from '../screens/Tasks/ReminderAlarmScreen';
@@ -156,13 +156,8 @@ const MainStack = () => {
           HISTORY
       ========================== */}
       <Stack.Screen
-        name="TimeBasedHistoryScreen"
-        component={TimeBasedHistoryScreen}
-      />
-
-      <Stack.Screen
-        name="NonTimeBasedHistoryScreen"
-        component={NonTimeBasedHistoryScreen}
+        name="HistoryScreen"
+        component={HistoryScreen}
       />
 
       {/* =========================
