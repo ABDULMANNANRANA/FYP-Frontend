@@ -16,6 +16,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../../context/ThemeContext';
 import { useFocusEffect } from '@react-navigation/native';
 import { BASE_URL } from '../../config/api';
+import { startSelfTaskReminders } from '../../utils/reminderScheduler';
 
 const goToLogin = navigation => {
   navigation.reset({
@@ -378,6 +379,20 @@ const HomeDashboard = ({ navigation }) => {
       fetchTasks();
     }, [fetchGroups, fetchTasks])
   );
+
+
+    // ============================================================
+  // SELF TASK REMINDERS
+  //
+  // Pops ReminderAlarmScreen 30 minutes before a task's time and
+  // again at the task time. Works for every self task regardless
+  // of the tab / mode on screen, and also schedules local
+  // notifications for when the app is in the background.
+  // (See src/utils/reminderScheduler.js)
+  // ============================================================
+  useEffect(() => {
+    return startSelfTaskReminders();
+  }, []);
 
   useEffect(() => {
     const interval = setInterval(() => {

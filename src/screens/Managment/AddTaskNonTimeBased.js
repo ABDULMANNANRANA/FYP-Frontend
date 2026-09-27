@@ -926,16 +926,15 @@ const AddTaskNonTimeBased = ({ navigation, route }) => {
               }
             >
               <TouchableOpacity
-                onPress={
-                  handleTimeBasedNavigation
-                }
+                onPress={handleTimeBasedNavigation}
                 style={[
                   styles.radioItem,
                   {
-                    backgroundColor:
-                      inputBg,
+                    backgroundColor: inputBg,
                     borderColor:
-                      primaryColor,
+                      taskType === "time"
+                        ? primaryColor
+                        : borderClr,
                   },
                 ]}
                 activeOpacity={0.7}
@@ -946,29 +945,33 @@ const AddTaskNonTimeBased = ({ navigation, route }) => {
                     styles.radioOuter,
                     {
                       borderColor:
-                        primaryColor,
+                        taskType === "time"
+                          ? primaryColor
+                          : subTextColor,
                     },
                   ]}
                 >
-                  <View
-                    style={[
-                      styles.radioInner,
-                      {
-                        backgroundColor:
-                          primaryColor,
-                      },
-                    ]}
-                  />
+                  {taskType === "time" && (
+                    <View
+                      style={[
+                        styles.radioInner,
+                        {
+                          backgroundColor: primaryColor,
+                        },
+                      ]}
+                    />
+                  )}
                 </View>
 
                 <Text
                   style={[
                     styles.radioText,
                     {
-                      color:
-                        textColor,
+                      color: textColor,
                       fontWeight:
-                        "700",
+                        taskType === "time"
+                          ? "700"
+                          : "500",
                     },
                   ]}
                 >
@@ -1038,6 +1041,7 @@ const AddTaskNonTimeBased = ({ navigation, route }) => {
                   Non-Time Based
                 </Text>
               </TouchableOpacity>
+
               <TouchableOpacity
                 onPress={
                   handleLocationBasedNavigation
@@ -2632,7 +2636,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
 });
-
 
 
 
