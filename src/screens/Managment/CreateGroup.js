@@ -1215,7 +1215,7 @@ const CreateGroup = ({ navigation }) => {
                   { color: primaryBtnText },
                 ]}
               >
-                NEXT: GROUP NAME →
+                NEXT: GROUP NAME
               </Text>
             </TouchableOpacity>
           </>
